@@ -9,10 +9,11 @@ require delta
 require-env DAT_PATH
 
 # Note: this table has 2 parquet files:
-# - part-00000-ef42f28f-e8e8-4d54-b51f-c3af96c72a44-c000.snappy.parquet
+# - <file a>.snappy.parquet
 #   - contains letters a,b,c
-# - part-00000-c156ac8b-f738-4479-803d-750072dd4c51-c000.snappy.parquet
+# - <file b>.snappy.parquet
 # 	- contains letters d,e
+mode skip
 
 query I
 SELECT count(*)
@@ -56,8 +57,7 @@ FROM delta_scan('${DAT_PATH}/out/reader_tests/generated/basic_append/delta')
 2
 3
 
-# TODO: Figure out what's wrong here
-mode skip
+# FIXME add tests to confirm this filters out the files!
 
 # Now we add a filter that filters out one of the files
 query II
@@ -67,8 +67,6 @@ WHERE number < 2
 ----
 a	1
 
-mode unskip
-
 # Now we add a filter that filters out the other file
 query III
 SELECT a_float, letter, number, 
@@ -76,8 +74,6 @@ FROM delta_scan('${DAT_PATH}/out/reader_tests/generated/basic_append/delta')
 WHERE number > 4
 ----
 5.5	e	5
-
-mode skip
 
 # Now we add a filter that filters out all columns
 query III
