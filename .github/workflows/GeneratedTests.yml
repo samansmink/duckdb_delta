@@ -53,7 +53,7 @@ jobs:
           GENERATED_DATA_AVAILABLE=1 make test
 
   debug-tests-linux:
-    name: Generated Tests (Linux)
+    name: Debug mode tests (Linux)
     runs-on: ubuntu-latest
     env:
       GEN: ninja
@@ -82,10 +82,6 @@ jobs:
         uses: lukka/run-vcpkg@v11.1
         with:
           vcpkgGitCommitId: a1a1cbc975abf909a6c8985a6a2b8fe20bbd9bd6
-
-      - name: Build
-        shell: bash
-        run: make generate-data
 
       - name: Test
         shell: bash
