@@ -193,26 +193,6 @@ ffi::EngineIterator EngineIteratorFromCallable(Callable& callable) {
     return {.data = &callable, .get_next = (const void *(*)(void*)) get_next};
 };
 
-// Helper function to prevent pushing down filters kernel cant handle
-// TODO: remove once kernel handles this properly?
-static bool CanHandleFilter(TableFilter *filter) {
-    switch (filter->filter_type) {
-        case TableFilterType::CONSTANT_COMPARISON:
-            return true;
-        case TableFilterType::CONJUNCTION_AND: {
-            auto &conjunction = static_cast<const ConjunctionAndFilter&>(*filter);
-            bool can_handle = true;
-            for (const auto& child : conjunction.child_filters) {
-                can_handle = can_handle && CanHandleFilter(child.get());
-            }
-            return can_handle;
-        }
-
-        default:
-            return false;
-    }
-}
-
 uintptr_t PredicateVisitor::VisitPredicate(PredicateVisitor* predicate, ffi::KernelExpressionVisitorState* state) {
     auto &filters = predicate->column_filters;
 
@@ -295,7 +275,7 @@ uintptr_t PredicateVisitor::VisitFilter(const string &col_name, const TableFilte
         case TableFilterType::CONJUNCTION_AND:
             return VisitAndFilter(col_name, static_cast<const ConjunctionAndFilter&>(filter), state);
         default:
-            throw NotImplementedException("Attempted to push down unimplemented filter type: '%s'", EnumUtil::ToString(filter.filter_type));
+            return ~0;
     }
 }
 

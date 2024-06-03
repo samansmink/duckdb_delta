@@ -1,0 +1,33 @@
+# name: test/sql/generated/lineitem_modified.test_slow
+# description: Test on some medium sized data
+# group: [delta_generated]
+
+require parquet
+
+require delta
+
+require tpch
+
+require-env GENERATED_DATA_AVAILABLE
+
+statement ok
+create view region_delta as from delta_scan('./data/generated/tpch_sf0_01/region/delta_lake');
+
+statement ok
+create view region_parquet as from parquet_scan('./data/generated/tpch_sf0_01/region/parquet/**/*.parquet');
+
+# This is what parquet returns
+#query II
+#SELECT r_regionkey, r_name
+#FROM region_parquet
+#WHERE r_name='EUROPE' AND r_name IS NOT NULL
+#----
+#3	EUROPE
+
+# Somehow delta does not agree
+query II
+SELECT r_regionkey, r_name
+FROM region_delta
+WHERE r_name='EUROPE' AND r_name IS NOT NULL
+----
+3	EUROPE
