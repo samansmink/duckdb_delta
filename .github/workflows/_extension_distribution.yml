@@ -318,7 +318,6 @@ jobs:
           python-version: '3.11'
 
       - name: Setup Rust
-        if: ${{ matrix.duckdb_arch == 'linux_amd64'}}
         uses: dtolnay/rust-toolchain@stable
 
       - uses: r-lib/actions/setup-r@v2
