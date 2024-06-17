@@ -52,17 +52,34 @@ if("${OS_NAME}" STREQUAL "linux")
         set(RUST_PLATFORM_TARGET "x86_64-unknown-linux-gnu")
     endif()
 elseif("${OS_NAME}" STREQUAL "osx")
-    # TODO: clean up upstream; we are not correctly setting OS_ARCH for cross compile
     if ("${OSX_BUILD_ARCH}" STREQUAL "arm64")
         set(RUST_PLATFORM_TARGET "aarch64-apple-darwin")
     elseif ("${OSX_BUILD_ARCH}" STREQUAL "x86_64")
         set(RUST_PLATFORM_TARGET "x86_64-apple-darwin")
     elseif ("${OS_ARCH}" STREQUAL "arm64")
         set(RUST_PLATFORM_TARGET "aarch64-apple-darwin")
-    else()
-        set(RUST_PLATFORM_TARGET "x86_64-apple-darwin")
+    endif()
+elseif(WIN32)
+    if (MINGW AND "${OS_ARCH}" STREQUAL "arm64")
+        set(RUST_PLATFORM_TARGET "aarch64-pc-windows-gnu")
+    elseif (MINGW AND "${OS_ARCH}" STREQUAL "x86_64")
+        set(RUST_PLATFORM_TARGET "x86_64-pc-windows-gnu")
+    elseif (MSVC AND "${OS_ARCH}" STREQUAL "arm64")
+        set(RUST_PLATFORM_TARGET "aarch64-pc-windows-msvc")
+    elseif (MSVC AND "${OS_ARCH}" STREQUAL "x86_64")
+        set(RUST_PLATFORM_TARGET "x86_64-pc-windows-msvc")
     endif()
 endif()
+
+if ("${RUST_PLATFORM_TARGET}" STREQUAL "")
+    set(RUST_PLATFORM_PARAM "")
+    message(STATUS "Building for unknown platform")
+else()
+    set(RUST_PLATFORM_PARAM "--target=${RUST_PLATFORM_TARGET}")
+    message(STATUS "Building RUST for platform: ${RUST_PLATFORM_TARGET}")
+endif()
+
+
 
 string(STRIP "${RUST_ENV_VARS}" RUST_ENV_VARS)
 
@@ -82,11 +99,11 @@ ExternalProject_Add(
         # Build debug build
         BUILD_COMMAND
             ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS}
-            cargo build --package delta_kernel_ffi --workspace --all-features --target=${RUST_PLATFORM_TARGET}
+            cargo build --package delta_kernel_ffi --workspace --all-features ${RUST_PLATFORM_PARAM}
         # Build release build
         COMMAND
             ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS}
-            cargo build --package delta_kernel_ffi --workspace --all-features --release --target=${RUST_PLATFORM_TARGET}
+            cargo build --package delta_kernel_ffi --workspace --all-features --release ${RUST_PLATFORM_PARAM}
         # Build DATs
         COMMAND
             ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS}
