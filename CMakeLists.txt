@@ -24,7 +24,7 @@ if(APPLE)
 elseif(UNIX)
     set(PLATFORM_LIBS m c resolv)
 elseif(WIN32)
-    set(PLATFORM_LIBS ws2_32 userenv advapi32)
+    set(PLATFORM_LIBS ws2_32 userenv advapi32 ntdll)
 else()
     message(STATUS "UNKNOWN OS")
 endif()
@@ -77,9 +77,9 @@ if ("${RUST_PLATFORM_TARGET}" STREQUAL "")
 endif()
 
 set(RUST_PLATFORM_PARAM "--target=${RUST_PLATFORM_TARGET}")
-message(STATUS "Building RUST for platform: ${RUST_PLATFORM_TARGET}")
+message(STATUS "Building for rust target: ${RUST_PLATFORM_TARGET}")
 
-# Remove trailing
+# Remove whitespaces before and after to prevent messed up env variables
 string(STRIP "${RUST_ENV_VARS}" RUST_ENV_VARS)
 
 # Having these set will mess up cross compilation to linux arm
