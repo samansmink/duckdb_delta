@@ -169,10 +169,10 @@ vector<bool> KernelUtils::FromDeltaBoolSlice(const struct ffi::KernelBoolSlice s
     return result;
 }
 
-PredicateVisitor::PredicateVisitor(const vector<string> &column_names, optional_ptr<TableFilterSet> filters) : EnginePredicate {
-        .predicate = this,
-        .visitor = (uintptr_t (*)(void*, ffi::KernelExpressionVisitorState*)) &VisitPredicate}
-{
+PredicateVisitor::PredicateVisitor(const vector<string> &column_names, optional_ptr<TableFilterSet> filters) {
+    predicate = this;
+    visitor = (uintptr_t (*)(void*, ffi::KernelExpressionVisitorState*)) &VisitPredicate;
+
     if (filters) {
         for (auto& filter : filters->filters) {
             column_filters[column_names[filter.first]] = filter.second.get();
