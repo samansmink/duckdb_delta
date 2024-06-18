@@ -190,7 +190,7 @@ static auto GetNextFromCallable(Callable* callable) -> decltype(std::declval<Cal
 template <typename Callable>
 ffi::EngineIterator EngineIteratorFromCallable(Callable& callable) {
     auto* get_next = &GetNextFromCallable<Callable>;
-    return {.data = &callable, .get_next = (const void *(*)(void*)) get_next};
+    return {&callable, (const void *(*)(void*)) get_next};
 };
 
 // Helper function to prevent pushing down filters kernel cant handle
