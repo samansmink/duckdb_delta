@@ -4,6 +4,7 @@
 duckdb_extension_load(delta
     SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}
     LOAD_TESTS
+    DONT_LINK
 )
 
 # Build the httpfs extension to test with s3/http
