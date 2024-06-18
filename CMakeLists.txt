@@ -90,6 +90,8 @@ set(RUST_UNSET_ENV_VARS --unset=CC --unset=CXX --unset=LD)
 ExternalProject_Add(
         ${KERNEL_NAME}
         GIT_REPOSITORY "https://github.com/delta-incubator/delta-kernel-rs"
+        # WARNING: the FFI headers are currently pinned due to the C linkage issue of the c++ headers. Currently, when bumping
+        # the kernel version, the produced header in ./src/include/delta_kernel_ffi.hpp should be also bumped, applying the fix
         GIT_TAG 08f0764a00e89f42136fd478823d28278adc7ee8
         # Prints the env variables passed to the cargo build to the terminal, useful in debugging because passing them
         # through CMake is an error-prone mess
@@ -118,8 +120,9 @@ ExternalProject_Add(
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 
-include_directories(${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers)
-include_directories(${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers)
+# TODO: when C linkage issue is resolved, we should switch back to using the generated headers
+#include_directories(${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers)
+#include_directories(${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers)
 
 # Hides annoying linker warnings
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3 CACHE STRING "Minimum OS X deployment version" FORCE)
