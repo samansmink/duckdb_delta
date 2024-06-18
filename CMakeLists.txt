@@ -24,8 +24,7 @@ if(APPLE)
 elseif(UNIX)
     set(PLATFORM_LIBS m c resolv)
 elseif(WIN32)
-    # Taken from https://codingbabble.com/posts/how-to-create-a-rust-plugin-for-unreal-engine/
-    set(PLATFORM_LIBS kernel32 advapi32 bcrypt kernel32 ntdll userenv ws2_32 kernel32 ws2_32 kernel32 ntdll kernel32 msvcrt)
+    set(PLATFORM_LIBS kernel32 advapi32 kernel32 ntdll userenv ws2_32 kernel32 ws2_32 kernel32 msvcrt bcrypt)
 else()
     message(STATUS "UNKNOWN OS")
 endif()
@@ -139,17 +138,19 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3 CACHE STRING "Minimum OS X deployment versi
 add_compile_definitions(DEFINE_DEFAULT_ENGINE)
 
 # Link delta-kernal-rs to static lib
+target_link_libraries(${EXTENSION_NAME} ${PLATFORM_LIBS})
 target_link_libraries(${EXTENSION_NAME}
         debug ${DELTA_KERNEL_LIBPATH_DEBUG}
         optimized ${DELTA_KERNEL_LIBPATH_RELEASE}
-        ${PLATFORM_LIBS})
+)
 add_dependencies(${EXTENSION_NAME} delta_kernel)
 
 # Link delta-kernal-rs to dynamic lib
+target_link_libraries(${LOADABLE_EXTENSION_NAME} ${PLATFORM_LIBS})
 target_link_libraries(${LOADABLE_EXTENSION_NAME}
         debug ${DELTA_KERNEL_LIBPATH_DEBUG}
         optimized ${DELTA_KERNEL_LIBPATH_RELEASE}
-        ${PLATFORM_LIBS})
+)
 add_dependencies(${LOADABLE_EXTENSION_NAME} delta_kernel)
 
 install(
