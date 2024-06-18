@@ -62,29 +62,36 @@ elseif("${OS_NAME}" STREQUAL "osx")
 elseif(WIN32)
     if (MINGW AND "${OS_ARCH}" STREQUAL "arm64")
         set(RUST_PLATFORM_TARGET "aarch64-pc-windows-gnu")
-    elseif (MINGW AND "${OS_ARCH}" STREQUAL "x86_64")
+    elseif (MINGW AND "${OS_ARCH}" STREQUAL "amd64")
         set(RUST_PLATFORM_TARGET "x86_64-pc-windows-gnu")
     elseif (MSVC AND "${OS_ARCH}" STREQUAL "arm64")
         set(RUST_PLATFORM_TARGET "aarch64-pc-windows-msvc")
-    elseif (MSVC AND "${OS_ARCH}" STREQUAL "x86_64")
+    elseif (MSVC AND "${OS_ARCH}" STREQUAL "amd64")
         set(RUST_PLATFORM_TARGET "x86_64-pc-windows-msvc")
     endif()
 endif()
 
+# We currently only support the predefined targets.
 if ("${RUST_PLATFORM_TARGET}" STREQUAL "")
-    set(RUST_PLATFORM_PARAM "")
-    message(STATUS "Building for unknown platform")
-else()
-    set(RUST_PLATFORM_PARAM "--target=${RUST_PLATFORM_TARGET}")
-    message(STATUS "Building RUST for platform: ${RUST_PLATFORM_TARGET}")
+    message(FATAL_ERROR "Failed to detect the correct platform")
 endif()
 
+set(RUST_PLATFORM_PARAM "--target=${RUST_PLATFORM_TARGET}")
+message(STATUS "Building RUST for platform: ${RUST_PLATFORM_TARGET}")
 
-
+# Remove trailing
 string(STRIP "${RUST_ENV_VARS}" RUST_ENV_VARS)
 
 # Having these set will mess up cross compilation to linux arm
 set(RUST_UNSET_ENV_VARS --unset=CC --unset=CXX --unset=LD)
+
+# Define all the relevant delta-kernel-rs paths/names
+set(DELTA_KERNEL_LIBNAME "${CMAKE_STATIC_LIBRARY_PREFIX}delta_kernel_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}")
+set(DELTA_KERNEL_LIBPATH_DEBUG "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/debug/${DELTA_KERNEL_LIBNAME}")
+set(DELTA_KERNEL_LIBPATH_RELEASE "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/release/${DELTA_KERNEL_LIBNAME}")
+set(DELTA_KERNEL_FFI_HEADER_PATH "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers")
+set(DELTA_KERNEL_FFI_HEADER_C "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers/delta_kernel_ffi.h")
+set(DELTA_KERNEL_FFI_HEADER_CXX "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers/delta_kernel_ffi.hpp")
 
 # Add rust_example as a CMake target
 ExternalProject_Add(
@@ -110,10 +117,11 @@ ExternalProject_Add(
         COMMAND
             ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS}
             cargo build --manifest-path=${CMAKE_BINARY_DIR}/rust/src/delta_kernel/acceptance/Cargo.toml
-        BUILD_BYPRODUCTS "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/debug/libdelta_kernel_ffi.a"
-        BUILD_BYPRODUCTS "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/release/libdelta_kernel_ffi.a"
-        BUILD_BYPRODUCTS "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers/delta_kernel_ffi.h"
-        BUILD_BYPRODUCTS "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers/delta_kernel_ffi.hpp"
+        # Define the byproducts, required for building with Ninja
+        BUILD_BYPRODUCTS "${DELTA_KERNEL_LIBPATH_DEBUG}"
+        BUILD_BYPRODUCTS "${DELTA_KERNEL_LIBPATH_RELEASE}"
+        BUILD_BYPRODUCTS "${DELTA_KERNEL_FFI_HEADER_C}"
+        BUILD_BYPRODUCTS "${DELTA_KERNEL_FFI_HEADER_CXX}"
         INSTALL_COMMAND ""
         LOG_BUILD ON)
 
@@ -121,8 +129,7 @@ build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 
 # TODO: when C linkage issue is resolved, we should switch back to using the generated headers
-#include_directories(${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers)
-#include_directories(${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers)
+#include_directories(${DELTA_KERNEL_FFI_HEADER_PATH})
 
 # Hides annoying linker warnings
 set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3 CACHE STRING "Minimum OS X deployment version" FORCE)
@@ -132,15 +139,15 @@ add_compile_definitions(DEFINE_DEFAULT_ENGINE)
 
 # Link delta-kernal-rs to static lib
 target_link_libraries(${EXTENSION_NAME}
-        debug "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/debug/libdelta_kernel_ffi.a"
-        optimized "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/release/libdelta_kernel_ffi.a"
+        debug ${DELTA_KERNEL_LIBPATH_DEBUG}
+        optimized ${DELTA_KERNEL_LIBPATH_RELEASE}
         ${PLATFORM_LIBS})
 add_dependencies(${EXTENSION_NAME} delta_kernel)
 
 # Link delta-kernal-rs to dynamic lib
 target_link_libraries(${LOADABLE_EXTENSION_NAME}
-        debug "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/debug/libdelta_kernel_ffi.a"
-        optimized "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/release/libdelta_kernel_ffi.a"
+        debug ${DELTA_KERNEL_LIBPATH_DEBUG}
+        optimized ${DELTA_KERNEL_LIBPATH_RELEASE}
         ${PLATFORM_LIBS})
 add_dependencies(${LOADABLE_EXTENSION_NAME} delta_kernel)
 
