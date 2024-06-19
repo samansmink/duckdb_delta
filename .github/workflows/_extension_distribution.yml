@@ -356,6 +356,18 @@ jobs:
           echo "ERROR LOG"
           cat build/release/rust/src/delta_kernel-stamp/delta_kernel-build-*.log
 
+      - name: Try to fetch native static libs ffi
+        if: always()
+        run: |
+          cd build/release/rust/src/delta_kernel/ffi
+          cargo rustc -q -- --print=native-static-libs
+
+      - name: Try to fetch native static libs kernel
+        if: always()
+        run: |
+          cd build/release/rust/src/delta_kernel/kernel
+          cargo rustc -q -- --print=native-static-libs
+
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ inputs.extension_name }}-${{ inputs.duckdb_version }}-extension-${{matrix.duckdb_arch}}${{inputs.artifact_postfix}}
