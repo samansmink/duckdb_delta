@@ -174,7 +174,6 @@ static ffi::EngineBuilder* CreateBuilder(ClientContext &context, const string &p
     }
     const auto &kv_secret = dynamic_cast<const KeyValueSecret &>(*secret_match.secret_entry->secret);
 
-
     // Here you would need to add the logic for setting the builder options for Azure
     // This is just a placeholder and will need to be replaced with the actual logic
     if (secret_type == "s3") {
@@ -182,6 +181,9 @@ static ffi::EngineBuilder* CreateBuilder(ClientContext &context, const string &p
         auto secret = kv_secret.TryGetValue("secret").ToString();
         auto session_token = kv_secret.TryGetValue("session_token").ToString();
         auto region = kv_secret.TryGetValue("region").ToString();
+        auto endpoint = kv_secret.TryGetValue("endpoint").ToString();
+        auto use_ssl = kv_secret.TryGetValue("use_ssl").ToString();
+        auto url_style = kv_secret.TryGetValue("url_style").ToString();
 
         if (key_id.empty() && secret.empty()) {
             ffi::set_builder_option(builder, KernelUtils::ToDeltaString("skip_signature"), KernelUtils::ToDeltaString("true"));
@@ -196,6 +198,21 @@ static ffi::EngineBuilder* CreateBuilder(ClientContext &context, const string &p
         if (!session_token.empty()) {
             ffi::set_builder_option(builder, KernelUtils::ToDeltaString("aws_session_token"), KernelUtils::ToDeltaString(session_token));
         }
+        if (!endpoint.empty() && endpoint != "s3.amazonaws.com") {
+            if(!StringUtil::StartsWith(endpoint, "https://") && !StringUtil::StartsWith(endpoint, "http://")) {
+                if(use_ssl == "1" || use_ssl == "NULL") {
+                    endpoint = "https://" + endpoint;
+                } else {
+                    endpoint = "http://" + endpoint;
+                }
+            }
+
+            if (StringUtil::StartsWith(endpoint, "http://")) {
+                ffi::set_builder_option(builder, KernelUtils::ToDeltaString("allow_http"), KernelUtils::ToDeltaString("true"));
+            }
+            ffi::set_builder_option(builder, KernelUtils::ToDeltaString("aws_endpoint"), KernelUtils::ToDeltaString(endpoint));
+        }
+
         ffi::set_builder_option(builder, KernelUtils::ToDeltaString("aws_region"), KernelUtils::ToDeltaString(region));
 
     } else if (secret_type == "azure") {
