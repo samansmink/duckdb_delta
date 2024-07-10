@@ -20,7 +20,7 @@ duckdb_extension_load(azure
 duckdb_extension_load(aws
         LOAD_TESTS
         GIT_URL https://github.com/duckdb/duckdb_aws
-        GIT_TAG 42c78d3f99e1a188a2b178ea59e3c17907af4fb2
+        GIT_TAG 3d1f5c8d0127ff7aaf127935721b197e5fdd95e5
 )
 
 # Build the tpch and tpcds extension for testing/benchmarking
