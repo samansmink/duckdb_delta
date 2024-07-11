@@ -141,7 +141,7 @@ jobs:
         env:
           DUCKDB_MINIO_TEST_SERVER_AVAILABLE: 1
           AWS_ACCESS_KEY_ID: minio_duckdb_user
-          AWS_SECRET_ACCESS_KEY: duckdb_env_testing_key
+          AWS_SECRET_ACCESS_KEY: minio_duckdb_user_password
           AWS_DEFAULT_REGION: eu-west-1
           AWS_ENDPOINT: duckdb-minio.com:9000
         run: |
@@ -157,7 +157,7 @@ jobs:
         env:
           DUCKDB_MINIO_TEST_SERVER_AVAILABLE: 1
           AWS_ACCESS_KEY_ID: minio_duckdb_user
-          AWS_SECRET_ACCESS_KEY: duckdb_env_testing_key
+          AWS_SECRET_ACCESS_KEY: minio_duckdb_user_password
           AWS_DEFAULT_REGION: eu-west-1
           AWS_ENDPOINT: duckdb-minio.com:9000
         run: |
