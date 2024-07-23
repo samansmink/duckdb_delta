@@ -19,6 +19,8 @@
 #include <string>
 #include <numeric>
 #include <regex>
+#include <duckdb/common/arrow/arrow_converter.hpp>
+#include <duckdb/function/table/arrow.hpp>
 
 namespace duckdb {
 
@@ -377,6 +379,7 @@ void DeltaSnapshot::Bind(vector<LogicalType> &return_types, vector<string> &name
     }
     // Store the bound names for resolving the complex filter pushdown later
     this->names = names;
+    this->types = return_types;
 }
 
 string DeltaSnapshot::GetFile(idx_t i) {
@@ -450,6 +453,7 @@ unique_ptr<MultiFileList> DeltaSnapshot::ComplexFilterPushdown(ClientContext &co
     auto filtered_list = make_uniq<DeltaSnapshot>(context, paths[0]);
     filtered_list->table_filters = std::move(filterstmp);
     filtered_list->names = names;
+    filtered_list->types = types;
 
     return std::move(filtered_list);
 }
@@ -830,6 +834,70 @@ void DeltaMultiFileReader::FinalizeChunk(ClientContext &context, const MultiFile
         //! Execute the expression directly into the output Chunk
         expr_executor.ExecuteExpression(chunk.data[delta_global_state.delta_file_number_idx]);
     }
+
+    return;
+    // At this point we are done processing the scan chunk. However, the kernel may have some final words. For that reason
+    // we forward the chunk in arrow format to the kernel.
+
+    // Empty chunks are not passed to kernel
+    if (chunk.size() == 0) {
+        return;
+    }
+
+    // Create the Arrow Array
+    auto array_wrapper = make_uniq<ArrowArrayWrapper>();
+    array_wrapper->arrow_array = ArrowArray();
+    auto arrow_schema = ArrowSchema();
+    ClientProperties options;
+    ArrowConverter::ToArrowArray(chunk, &array_wrapper->arrow_array, options);
+
+    // Create the Arrow Schema
+    idx_t column_count;
+    if (!global_state->extra_columns.empty()) {
+        auto types = snapshot.types;
+        auto names = snapshot.names;
+        idx_t i = 0;
+        for (const auto& extra_column_type : global_state->extra_columns) {
+            types.push_back(extra_column_type);
+            names.push_back("_extra_col_" + to_string(i++));
+        }
+        column_count = types.size();
+        ArrowConverter::ToArrowSchema(&arrow_schema, types, names, options);
+    } else {
+        column_count = snapshot.types.size();
+        ArrowConverter::ToArrowSchema(&arrow_schema, snapshot.types, snapshot.names, options);
+    }
+    D_ASSERT(column_count = chunk.ColumnCount());
+
+    // TODO pass arrow array to kernel here...
+
+    // Start by building an arrow scan
+    ArrowScanLocalState local_scan_state(std::move(array_wrapper));
+
+    // Fill the projection ids with incrementing indices
+    local_scan_state.column_ids.resize(column_count);
+    std::iota(std::begin(local_scan_state.column_ids), std::end(local_scan_state.column_ids), 0);
+
+    // Create the arrow_table
+    ArrowTableType arrow_table;
+    for (idx_t col_idx = 0; col_idx < (idx_t)arrow_schema.n_children; col_idx++) {
+		auto &schema = *arrow_schema.children[col_idx];
+        if (!schema.release) {
+            throw InvalidInputException("arrow_scan: released schema passed");
+		}
+        auto arrow_type = ArrowTableFunction::GetArrowLogicalType(schema);
+		arrow_table.AddColumn(col_idx, std::move(arrow_type));
+	}
+
+    auto output_size = MinValue<idx_t>(STANDARD_VECTOR_SIZE, NumericCast<idx_t>(local_scan_state.chunk->arrow_array.length) - local_scan_state.chunk_offset);
+
+    DataChunk chunk_copy;
+    chunk_copy.Initialize(context, chunk.GetTypes(), chunk.size());
+
+    chunk_copy.SetCardinality(output_size);
+    ArrowTableFunction::ArrowToDuckDB(local_scan_state, arrow_table.GetColumns(), chunk_copy, 0);
+
+    chunk.Reference(chunk_copy);
 };
 
 bool DeltaMultiFileReader::ParseOption(const string &key, const Value &val, MultiFileReaderOptions &options, ClientContext &context) {

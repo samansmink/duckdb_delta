@@ -75,6 +75,7 @@ public:
 
     //! Names
     vector<string> names;
+    vector<LogicalType> types;
 
     //! Metadata map for files
     vector<unique_ptr<DeltaFileMetaData>> metadata;
