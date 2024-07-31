@@ -835,7 +835,6 @@ void DeltaMultiFileReader::FinalizeChunk(ClientContext &context, const MultiFile
         expr_executor.ExecuteExpression(chunk.data[delta_global_state.delta_file_number_idx]);
     }
 
-    return;
     // At this point we are done processing the scan chunk. However, the kernel may have some final words. For that reason
     // we forward the chunk in arrow format to the kernel.
 
@@ -870,6 +869,8 @@ void DeltaMultiFileReader::FinalizeChunk(ClientContext &context, const MultiFile
     D_ASSERT(column_count = chunk.ColumnCount());
 
     // TODO pass arrow array to kernel here...
+    // array_wrapper->arrow_array is the CDataInterface to the arrow array
+    // arrow_schema is the CDataInterface to the schema
 
     // Start by building an arrow scan
     ArrowScanLocalState local_scan_state(std::move(array_wrapper));
