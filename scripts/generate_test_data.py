@@ -6,6 +6,8 @@ import duckdb
 import pandas as pd
 import os
 import shutil
+import math
+import glob
 
 BASE_PATH = os.path.dirname(os.path.realpath(__file__)) + "/../data/generated"
 TMP_PATH = '/tmp'
@@ -14,7 +16,7 @@ def delete_old_files():
     if (os.path.isdir(BASE_PATH)):
         shutil.rmtree(BASE_PATH)
 
-def generate_test_data_delta_rs_multi(path, init, tables):
+def generate_test_data_delta_rs_multi(path, init, tables, splits = 1):
     """
     generate_test_data_delta_rs generates some test data using delta-rs and duckdb
 
@@ -28,28 +30,33 @@ def generate_test_data_delta_rs_multi(path, init, tables):
     if (os.path.isdir(generated_path)):
         return
 
-    con = duckdb.connect()
+    os.makedirs(f"{generated_path}")
+
+    # First we write a DuckDB file
+    con = duckdb.connect(f"{generated_path}/duckdb.db")
 
     con.sql(init)
 
+    # Then we write the parquet files
     for table in tables:
-        # Write delta table data
-        test_table_df = con.sql(table['query']).df()
-        table_name = table['name']
+        total_count = con.sql(f"select count(*) from ({table['query']})").fetchall()[0][0]
+        tuples_per_file = math.ceil(total_count / splits)
 
-        os.makedirs(f"{generated_path}/{table_name}/delta_lake", exist_ok=True)
-        os.makedirs(f"{generated_path}/{table_name}/duckdb", exist_ok=True)
+        file_no = 0
+        while file_no < splits:
+            os.makedirs(f"{generated_path}/{table['name']}/parquet", exist_ok=True)
+            # Write DuckDB's reference data
+            con.sql(f"COPY ({table['query']} where rowid >= {(file_no) * tuples_per_file} and rowid < {(file_no+1) * tuples_per_file}) to '{generated_path}/{table['name']}/parquet/data_{file_no}.parquet' (FORMAT parquet)")
+            file_no += 1
 
-        if 'part_column' in table:
-            write_deltalake(f"{generated_path}/{table_name}/delta_lake", test_table_df,  partition_by=[table['part_column']])
-        else:
-            write_deltalake(f"{generated_path}/{table_name}/delta_lake", test_table_df)
-
-        # Write DuckDB's reference data
-        if 'part_column' in table:
-            con.sql(f"COPY ({table['query']}) to '{generated_path}/{table_name}/duckdb' (FORMAT parquet, PARTITION_BY {table['part_column']})")
-        else:
-            con.sql(f"COPY ({table['query']}) to '{generated_path}/{table_name}/duckdb/data.parquet' (FORMAT parquet)")
+    for table in tables:
+        con = duckdb.connect(f"{generated_path}/duckdb.db")
+        file_list = list(glob.glob(f"{generated_path}/{table['name']}/parquet/*.parquet"))
+        file_list = sorted(file_list)
+        for file in file_list:
+            test_table_df = con.sql(f'from "{file}"').arrow()
+            os.makedirs(f"{generated_path}/{table['name']}/delta_lake", exist_ok=True)
+            write_deltalake(f"{generated_path}/{table['name']}/delta_lake", test_table_df, mode="append")
 
 def generate_test_data_delta_rs(path, query, part_column=False, add_golden_table=True):
     """
@@ -132,12 +139,19 @@ def generate_test_data_pyspark(name, current_path, input_path, delete_predicate 
 # TO CLEAN, uncomment
 # delete_old_files()
 
-### TPCH SF1
-init = "call dbgen(sf=1);"
+### TPCH SF1 in 10 appends
+init = f"call dbgen(sf=0.01);"
 tables = ["customer","lineitem","nation","orders","part","partsupp","region","supplier"]
 queries = [f"from {x}" for x in tables]
 tables = [{'name': x[0], 'query':x[1]} for x in zip(tables,queries)]
-generate_test_data_delta_rs_multi("delta_rs_tpch_sf1", init, tables)
+generate_test_data_delta_rs_multi("delta_rs_tpch_sf0_01", init, tables, splits=10)
+
+### TPCDS SF1 in 10 appends
+init = f"call dsdgen(sf=0.01);"
+tables = ["call_center","catalog_page","catalog_returns","catalog_sales","customer","customer_demographics","customer_address","date_dim","household_demographics","inventory","income_band","item","promotion","reason","ship_mode","store","store_returns","store_sales","time_dim","warehouse","web_page","web_returns","web_sales","web_site"]
+queries = [f"from {x}" for x in tables]
+tables = [{'name': x[0], 'query':x[1]} for x in zip(tables,queries)]
+generate_test_data_delta_rs_multi("delta_rs_tpcds_sf0_01", init, tables, splits=10)
 
 ### Simple partitioned table
 query = "CREATE table test_table AS SELECT i, i%2 as part from range(0,10) tbl(i);"
