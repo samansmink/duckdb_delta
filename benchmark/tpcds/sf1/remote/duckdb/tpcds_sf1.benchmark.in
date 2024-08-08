@@ -14,6 +14,8 @@ require tpcds
 
 require httpfs
 
+require aws
+
 load
 CREATE SECRET IF NOT EXISTS s1 (type s3, provider credential_chain);
 

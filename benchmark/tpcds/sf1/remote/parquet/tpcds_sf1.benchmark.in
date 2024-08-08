@@ -12,6 +12,8 @@ require parquet
 
 require httpfs
 
+require aws
+
 load benchmark/tpcds/sf1/remote/parquet/load.sql
 
 run duckdb/extension/tpcds/dsdgen/queries/${QUERY_NUMBER_PADDED}.sql
