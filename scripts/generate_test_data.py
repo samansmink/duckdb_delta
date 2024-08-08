@@ -147,11 +147,11 @@ tables = [{'name': x[0], 'query':x[1]} for x in zip(tables,queries)]
 generate_test_data_delta_rs_multi("delta_rs_tpch_sf0_01", init, tables, splits=10)
 
 ### TPCDS SF1 in 10 appends
-init = f"call dsdgen(sf=0.01);"
+init = f"call dsdgen(sf=1);"
 tables = ["call_center","catalog_page","catalog_returns","catalog_sales","customer","customer_demographics","customer_address","date_dim","household_demographics","inventory","income_band","item","promotion","reason","ship_mode","store","store_returns","store_sales","time_dim","warehouse","web_page","web_returns","web_sales","web_site"]
 queries = [f"from {x}" for x in tables]
 tables = [{'name': x[0], 'query':x[1]} for x in zip(tables,queries)]
-generate_test_data_delta_rs_multi("delta_rs_tpcds_sf0_01", init, tables, splits=10)
+generate_test_data_delta_rs_multi("delta_rs_tpcds_sf1", init, tables, splits=10)
 
 ### Simple partitioned table
 query = "CREATE table test_table AS SELECT i, i%2 as part from range(0,10) tbl(i);"
@@ -217,3 +217,12 @@ con = duckdb.connect()
 con.query(f"call dsdgen(sf=0.01); EXPORT DATABASE '{TMP_PATH}/tpcds_sf0_01_export' (FORMAT parquet)")
 for table in ["call_center","catalog_page","catalog_returns","catalog_sales","customer","customer_demographics","customer_address","date_dim","household_demographics","inventory","income_band","item","promotion","reason","ship_mode","store","store_returns","store_sales","time_dim","warehouse","web_page","web_returns","web_sales","web_site"]:
     generate_test_data_pyspark(f"tpcds_sf0_01_{table}", f'tpcds_sf0_01/{table}', f'{TMP_PATH}/tpcds_sf0_01_export/{table}.parquet')
+
+## TPCDS SF1 full dataset
+con = duckdb.connect()
+con.query(f"call dsdgen(sf=1); EXPORT DATABASE '{TMP_PATH}/tpcds_sf1_export' (FORMAT parquet)")
+for table in ["call_center","catalog_page","catalog_returns","catalog_sales","customer","customer_demographics","customer_address","date_dim","household_demographics","inventory","income_band","item","promotion","reason","ship_mode","store","store_returns","store_sales","time_dim","warehouse","web_page","web_returns","web_sales","web_site"]:
+    generate_test_data_pyspark(f"tpcds_sf1_{table}", f'tpcds_sf1/{table}', f'{TMP_PATH}/tpcds_sf1_export/{table}.parquet')
+con.query(f"attach '{BASE_PATH + '/tpcds_sf1/duckdb.db'}' as duckdb_out")
+for table in ["call_center","catalog_page","catalog_returns","catalog_sales","customer","customer_demographics","customer_address","date_dim","household_demographics","inventory","income_band","item","promotion","reason","ship_mode","store","store_returns","store_sales","time_dim","warehouse","web_page","web_returns","web_sales","web_site"]:
+    con.query(f"create table duckdb_out.{table} as from {table}")

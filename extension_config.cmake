@@ -10,11 +10,11 @@ duckdb_extension_load(delta
 duckdb_extension_load(httpfs)
 
 # Build the azure extension to test with azure
-duckdb_extension_load(azure
-        LOAD_TESTS
-        GIT_URL https://github.com/duckdb/duckdb_azure
-        GIT_TAG d92b3b87ff06e6694883b1a6dbf684eeefedd609
-)
+#duckdb_extension_load(azure
+#        LOAD_TESTS
+#        GIT_URL https://github.com/duckdb/duckdb_azure
+#        GIT_TAG d92b3b87ff06e6694883b1a6dbf684eeefedd609
+#)
 
 # Build the aws extension to test with credential providers
 duckdb_extension_load(aws
