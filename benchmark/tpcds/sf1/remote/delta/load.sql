@@ -1,3 +1,4 @@
+CREATE SECRET IF NOT EXISTS s1 (type s3, provider credential_chain);
 SET VARIABLE delta_path = 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark';
 
 create view call_center as from delta_scan(getvariable('delta_path') || '/call_center/delta_lake');
