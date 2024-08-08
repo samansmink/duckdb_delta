@@ -1,6 +1,6 @@
 CREATE SECRET IF NOT EXISTS s1 (type s3, provider credential_chain);
 
-SET VARIABLE parquet_path = 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark';
+SET VARIABLE parquet_path = 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_delta_rs';
 
 create view call_center as from parquet_scan(getvariable('parquet_path') || '/call_center/parquet/**/*.parquet');
 create view catalog_page as from parquet_scan(getvariable('parquet_path') || '/catalog_page/parquet/**/*.parquet');

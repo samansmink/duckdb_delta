@@ -20,7 +20,7 @@ load
 CREATE SECRET IF NOT EXISTS s1 (type s3, provider credential_chain);
 
 run
-attach 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/duckdb.db' as tpcds (READONLY 1);
+attach 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_delta_rs/duckdb.db' as tpcds (READONLY 1);
 use tpcds;
 pragma tpcds(${QUERY_NUMBER})
 
