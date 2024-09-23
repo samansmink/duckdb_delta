@@ -19,7 +19,9 @@
 #include <string>
 #include <numeric>
 #include <regex>
+#include <duckdb/main/attached_database.hpp>
 #include <duckdb/main/client_data.hpp>
+#include <storage/delta_catalog.hpp>
 
 namespace duckdb {
 
@@ -390,7 +392,14 @@ void DeltaSnapshot::Bind(vector<LogicalType> &return_types, vector<string> &name
     if (!initialized) {
         InitializeFiles();
     }
-    auto schema = SchemaVisitor::VisitSnapshotSchema(snapshot.get());
+
+    unique_ptr<SchemaVisitor::FieldList> schema;
+
+    {
+        auto snapshot_ref = snapshot->GetLockingRef();
+        schema = SchemaVisitor::VisitSnapshotSchema(snapshot_ref.GetPtr());
+    }
+
     for (const auto &field: *schema) {
         names.push_back(field.first);
         return_types.push_back(field.second);
@@ -439,18 +448,21 @@ void DeltaSnapshot::InitializeFiles() {
     auto interface_builder = CreateBuilder(context, paths[0]);
     extern_engine = TryUnpackKernelResult( ffi::builder_build(interface_builder));
 
-    // Initialize Snapshot
-    snapshot = TryUnpackKernelResult(ffi::snapshot(path_slice, extern_engine.get()));
+    if (!snapshot) {
+        snapshot = make_shared_ptr<SharedKernelSnapshot>(TryUnpackKernelResult(ffi::snapshot(path_slice, extern_engine.get())));
+    }
+
+    auto snapshot_ref = snapshot->GetLockingRef();
 
     // Create Scan
     PredicateVisitor visitor(names, &table_filters);
-    scan = TryUnpackKernelResult(ffi::scan(snapshot.get(), extern_engine.get(), &visitor));
+    scan = TryUnpackKernelResult(ffi::scan(snapshot_ref.GetPtr(), extern_engine.get(), &visitor));
 
     // Create GlobalState
     global_state = ffi::get_global_scan_state(scan.get());
 
     // Set version
-    this->version = ffi::version(snapshot.get());
+    this->version = ffi::version(snapshot_ref.GetPtr());
 
     // Create scan data iterator
     scan_data_iterator = TryUnpackKernelResult(ffi::kernel_scan_data_init(extern_engine.get(), scan.get()));
@@ -470,6 +482,9 @@ unique_ptr<MultiFileList> DeltaSnapshot::ComplexFilterPushdown(ClientContext &co
     auto filtered_list = make_uniq<DeltaSnapshot>(context, paths[0]);
     filtered_list->table_filters = std::move(filterstmp);
     filtered_list->names = names;
+
+    // Copy over the snapshot, this avoids reparsing metadata
+    filtered_list->snapshot = snapshot;
 
     return std::move(filtered_list);
 }
@@ -621,6 +636,18 @@ void DeltaMultiFileReader::FinalizeBind(const MultiFileReaderOptions &file_optio
 unique_ptr<MultiFileList> DeltaMultiFileReader::CreateFileList(ClientContext &context, const vector<string>& paths, FileGlobOptions options) {
     if (paths.size() != 1) {
         throw BinderException("'delta_scan' only supports single path as input");
+    }
+
+    // TODO: this is techinically incorrect for `select * from attach_delta union all from delta_scan('../some/path')
+    //       since the first one should scan the snapshot from the transaction whereas the second one should scan the current state
+    for (auto& transaction : context.ActiveTransaction().OpenedTransactions()) {
+        auto & catalog = transaction.get().GetCatalog();
+        if (catalog.GetCatalogType() == "delta" && catalog.GetDBPath() == paths[0]) {
+            auto snapshot = make_uniq<DeltaSnapshot>(context, paths[0]);
+            snapshot->snapshot =
+
+            return std::move(snapshot);
+        }
     }
 
     return make_uniq<DeltaSnapshot>(context, paths[0]);

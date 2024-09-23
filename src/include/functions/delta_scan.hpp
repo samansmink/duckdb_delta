@@ -70,7 +70,8 @@ public:
     idx_t version;
 
     //! Delta Kernel Structures
-    KernelSnapshot snapshot;
+    shared_ptr<SharedKernelSnapshot> snapshot;
+
     KernelExternEngine extern_engine;
     KernelScan scan;
     KernelGlobalScanState global_state;
