@@ -16,7 +16,7 @@ jobs:
     name: Build extension binaries
     uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.1.0
     with:
-      duckdb_version: v1.1.0
+      duckdb_version: af39bd0dcf66876e09ac2a7c3baa28fe1b301151
       extension_name: delta
       enable_rust: true
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;windows_amd64_rtools'
@@ -28,6 +28,6 @@ jobs:
     secrets: inherit
     with:
       extension_name: delta
-      duckdb_version: v1.1.0
+      duckdb_version: af39bd0dcf66876e09ac2a7c3baa28fe1b301151
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;windows_amd64_rtools'
       deploy_latest: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
