@@ -13,6 +13,11 @@
 
 namespace duckdb {
 
+struct DeltaFunctionInfo : public TableFunctionInfo {
+    shared_ptr<SharedKernelSnapshot> snapshot;
+    string expected_path;
+};
+
 struct DeltaFileMetaData {
     DeltaFileMetaData() {};
 
@@ -104,7 +109,7 @@ struct DeltaMultiFileReaderGlobalState : public MultiFileReaderGlobalState {
 };
 
 struct DeltaMultiFileReader : public MultiFileReader {
-    static unique_ptr<MultiFileReader> CreateInstance();
+    static unique_ptr<MultiFileReader> CreateInstance(const TableFunction &table_function);
     //! Return a DeltaSnapshot
     unique_ptr<MultiFileList> CreateFileList(ClientContext &context, const vector<string> &paths,
                    FileGlobOptions options) override;
@@ -142,6 +147,12 @@ struct DeltaMultiFileReader : public MultiFileReader {
     //! Override the ParseOption call to parse delta_scan specific options
     bool ParseOption(const string &key, const Value &val, MultiFileReaderOptions &options,
                                         ClientContext &context) override;
+
+    // For the TableFunction used on attached delta tables, the kernel snapshot is injected into the MultiFileReader to
+    // ensure the table is read at the correct timestamp
+    shared_ptr<SharedKernelSnapshot> kernel_snapshot;
+    // Path for when kernel_snapshot is set: this multifilereader can then only be used to scan this path
+    string kernel_snapshot_path;
 };
 
 } // namespace duckdb

@@ -1,6 +1,10 @@
 #include "storage/delta_catalog.hpp"
 #include "storage/delta_schema_entry.hpp"
 #include "storage/delta_table_entry.hpp"
+
+#include "delta_utils.hpp"
+#include "functions/delta_scan.hpp"
+
 #include "storage/delta_transaction.hpp"
 #include "duckdb/storage/statistics/base_statistics.hpp"
 #include "duckdb/storage/table_storage_info.hpp"
@@ -10,6 +14,8 @@
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
 #include "duckdb/parser/tableref/table_function_ref.hpp"
 #include "../../duckdb/third_party/catch/catch.hpp"
+
+#include <functional>
 
 namespace duckdb {
 
@@ -34,11 +40,18 @@ TableFunction DeltaTableEntry::GetScanFunction(ClientContext &context, unique_pt
 	auto delta_scan_function = delta_function_set.functions.GetFunctionByArguments(context, {LogicalType::VARCHAR});
 	auto &delta_catalog = catalog.Cast<DeltaCatalog>();
 
+    // Copy over the internal kernel snapshot
+    auto function_info = make_shared_ptr<DeltaFunctionInfo>();
+    function_info->snapshot = this->snapshot->snapshot;
+    function_info->expected_path = delta_catalog.GetDBPath();
+    delta_scan_function.function_info = std::move(function_info);
+
 	vector<Value> inputs = {delta_catalog.GetDBPath()};
 	named_parameter_map_t param_map;
 	vector<LogicalType> return_types;
 	vector<string> names;
 	TableFunctionRef empty_ref;
+
 
 	TableFunctionBindInput bind_input(inputs, param_map, return_types, names, nullptr, nullptr, delta_scan_function,
 	                                  empty_ref);

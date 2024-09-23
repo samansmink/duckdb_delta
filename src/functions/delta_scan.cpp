@@ -544,8 +544,15 @@ unique_ptr<NodeStatistics> DeltaSnapshot::GetCardinality(ClientContext &context)
     return nullptr;
 }
 
-unique_ptr<MultiFileReader> DeltaMultiFileReader::CreateInstance() {
-    return std::move(make_uniq<DeltaMultiFileReader>());
+unique_ptr<MultiFileReader> DeltaMultiFileReader::CreateInstance(const TableFunction &table_function) {
+    auto result = make_uniq<DeltaMultiFileReader>();
+
+    if (table_function.function_info) {
+        result->kernel_snapshot = table_function.function_info->Cast<DeltaFunctionInfo>().snapshot;
+        result->kernel_snapshot_path = table_function.function_info->Cast<DeltaFunctionInfo>().expected_path;
+    }
+
+    return std::move(result);
 }
 
 bool DeltaMultiFileReader::Bind(MultiFileReaderOptions &options, MultiFileList &files,
@@ -638,14 +645,15 @@ unique_ptr<MultiFileList> DeltaMultiFileReader::CreateFileList(ClientContext &co
         throw BinderException("'delta_scan' only supports single path as input");
     }
 
-    // TODO: this is techinically incorrect for `select * from attach_delta union all from delta_scan('../some/path')
-    //       since the first one should scan the snapshot from the transaction whereas the second one should scan the current state
-    for (auto& transaction : context.ActiveTransaction().OpenedTransactions()) {
-        auto & catalog = transaction.get().GetCatalog();
-        if (catalog.GetCatalogType() == "delta" && catalog.GetDBPath() == paths[0]) {
-            auto snapshot = make_uniq<DeltaSnapshot>(context, paths[0]);
-            snapshot->snapshot =
+    if (kernel_snapshot) {
+        if (kernel_snapshot_path != paths[0]) {
+            throw InternalException("Expected path from injected function info did not match! '%s' expected to match '%s'", kernel_snapshot_path, paths[0]);
+        }
 
+        // This takes the kernel snapshot from the delta snapshot and ensures we use that snapshot for reading
+        if (kernel_snapshot) {
+            auto snapshot = make_uniq<DeltaSnapshot>(context, paths[0]);
+            snapshot->snapshot = kernel_snapshot;
             return std::move(snapshot);
         }
     }
