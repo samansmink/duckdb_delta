@@ -111,7 +111,9 @@ void DeltaSchemaEntry::Scan(ClientContext &context, CatalogType type,
 
     // LoadTable(context);
 
-	callback(*table);
+    if (table) {
+        callback(*table);
+    }
 }
 void DeltaSchemaEntry::Scan(CatalogType type, const std::function<void(CatalogEntry &)> &callback) {
 	throw NotImplementedException("Scan without context not supported");
