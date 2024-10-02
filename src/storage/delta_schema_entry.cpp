@@ -1,7 +1,9 @@
 #include "storage/delta_schema_entry.hpp"
 
-#include <functions/delta_scan.hpp>
-#include <storage/delta_catalog.hpp>
+#include "functions/delta_scan.hpp"
+#include "storage/delta_catalog.hpp"
+
+#include "delta_extension.hpp"
 
 #include "storage/delta_table_entry.hpp"
 #include "storage/delta_transaction.hpp"
@@ -135,8 +137,8 @@ optional_ptr<CatalogEntry> DeltaSchemaEntry::GetEntry(CatalogTransaction transac
     return nullptr;
 }
 
-void DeltaSchemaEntry::LoadTable(CatalogTransaction &transaction) {
-    if (table) {
+void DeltaSchemaEntry::LoadTable(CatalogTransaction &transaction, bool force_reload) {
+    if (!force_reload && table) {
 #ifdef DEBUG
         //  Confirm that the transaction is looking at the same version of the table
         auto snapshot = GetDeltaTransaction(transaction).snapshot;
@@ -165,6 +167,7 @@ void DeltaSchemaEntry::LoadTable(CatalogTransaction &transaction) {
     for (idx_t i = 0; i < return_types.size(); i++) {
         table_info.columns.AddColumn(ColumnDefinition(names[i], return_types[i]));
     }
+    table_info.table = DEFAULT_DELTA_TABLE;
     table = make_uniq<DeltaTableEntry>(catalog, *this, table_info);
     table->snapshot = delta_transaction.snapshot;
 }

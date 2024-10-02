@@ -41,23 +41,24 @@ select utf8 from dt.main.delta_table
 3
 4
 
-# Now we create a different table that is actually called delta_table
+# Now we create a different table that is actually called dt
 statement ok
 create table dt as select 1 as id, 2 as utf8
 
-query II
+# This is now ambiguous!
+statement error
 from dt
 ----
-1	2
+Catalog Error: Ambiguity detected for 'dt': this could either refer to the 'Table' 'dt', or the attached catalog 'dt' which has a default table. To avoid this error, either detach the catalog and reattach under a different name, or use a fully qualified name for the 'Table': 'memory.main.dt' or for the Catalog Default Table: 'dt.main.delta_table'.
 
-# Join the two tables
+# Join the two tables using fully qualified names
 query III
 SELECT
     id,
     dt1.utf8,
     dt2.utf8
 FROM
-    dt as dt1
+    memory.main.dt as dt1
 LEFT JOIN
     dt.main.delta_table as dt2
 ON
@@ -99,4 +100,3 @@ select utf8 from main.delta_table
 2
 3
 4
-

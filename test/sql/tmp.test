@@ -1,0 +1,15 @@
+# name: test/sql/generated/tpcds.test_slow
+# description: Test on some medium sized data
+# group: [delta_generated]
+
+require parquet
+
+require delta
+
+require-env DAT_PATH
+
+statement ok
+ATTACH 'data/generated/delta_rs_tpch_sf0_01/region/delta_lake' as dt (type delta);
+
+statement ok
+select count(*) from dt;

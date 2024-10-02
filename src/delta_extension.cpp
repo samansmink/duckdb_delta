@@ -15,13 +15,18 @@ namespace duckdb {
 static unique_ptr<Catalog> DeltaCatalogAttach(StorageExtensionInfo *storage_info, ClientContext &context,
                                        AttachedDatabase &db, const string &name, AttachInfo &info,
                                        AccessMode access_mode) {
-	return make_uniq<DeltaCatalog>(db, info.path, access_mode);
+
+    auto res = make_uniq<DeltaCatalog>(db, info.path, access_mode);
+
+    res->SetDefaultTable(DEFAULT_SCHEMA, DEFAULT_DELTA_TABLE);
+
+	return std::move(res);
 }
 
 static unique_ptr<TransactionManager> CreateTransactionManager(StorageExtensionInfo *storage_info, AttachedDatabase &db,
                                                                Catalog &catalog) {
-	auto &uc_catalog = catalog.Cast<DeltaCatalog>();
-	return make_uniq<DeltaTransactionManager>(db, uc_catalog);
+	auto &delta_catalog = catalog.Cast<DeltaCatalog>();
+	return make_uniq<DeltaTransactionManager>(db, delta_catalog);
 }
 
 class DeltaStorageExtension : public StorageExtension {

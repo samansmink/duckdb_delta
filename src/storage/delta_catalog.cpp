@@ -61,23 +61,23 @@ DatabaseSize DeltaCatalog::GetDatabaseSize(ClientContext &context) {
 
 unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, LogicalInsert &op,
                                                    unique_ptr<PhysicalOperator> plan) {
-	throw NotImplementedException("DeltaCatalog PlanInsert");
+	throw NotImplementedException("DeltaCatalog does not support inserts");
 }
 unique_ptr<PhysicalOperator> DeltaCatalog::PlanCreateTableAs(ClientContext &context, LogicalCreateTable &op,
                                                           unique_ptr<PhysicalOperator> plan) {
-	throw NotImplementedException("DeltaCatalog PlanCreateTableAs");
+	throw NotImplementedException("DeltaCatalog does not support creating new tables");
 }
 unique_ptr<PhysicalOperator> DeltaCatalog::PlanDelete(ClientContext &context, LogicalDelete &op,
                                                    unique_ptr<PhysicalOperator> plan) {
-	throw NotImplementedException("DeltaCatalog PlanDelete");
+	throw NotImplementedException("DeltaCatalog does not support deletes");
 }
 unique_ptr<PhysicalOperator> DeltaCatalog::PlanUpdate(ClientContext &context, LogicalUpdate &op,
                                                    unique_ptr<PhysicalOperator> plan) {
-	throw NotImplementedException("DeltaCatalog PlanUpdate");
+	throw NotImplementedException("DeltaCatalog does not support updates");
 }
 unique_ptr<LogicalOperator> DeltaCatalog::BindCreateIndex(Binder &binder, CreateStatement &stmt, TableCatalogEntry &table,
                                                        unique_ptr<LogicalOperator> plan) {
-	throw NotImplementedException("DeltaCatalog BindCreateIndex");
+	throw NotImplementedException("DeltaCatalog does not support creating indices");
 }
 
 } // namespace duckdb

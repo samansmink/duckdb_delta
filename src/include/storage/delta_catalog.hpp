@@ -65,17 +65,6 @@ public:
 
 	DatabaseSize GetDatabaseSize(ClientContext &context) override;
 
-    //! Whether this catalog has a default table. Catalogs with a default table can be queries by their catalog name
-    bool HasDefaultTable() const override {
-        return true;
-    }
-    string GetDefaultTable() const override {
-        return "delta_table";
-    }
-    string GetDefaultSchema() const override {
-        return DEFAULT_SCHEMA;
-    }
-
 	bool InMemory() override;
 	string GetDBPath() override;
 

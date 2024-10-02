@@ -11,8 +11,6 @@
 #include "duckdb/catalog/catalog_entry/schema_catalog_entry.hpp"
 #include "storage/delta_table_entry.hpp"
 
-#define DEFAULT_DELTA_TABLE "delta_table"
-
 namespace duckdb {
 class DeltaTransaction;
 
@@ -21,7 +19,7 @@ public:
 	DeltaSchemaEntry(Catalog &catalog, CreateSchemaInfo &info);
 	~DeltaSchemaEntry() override;
 
-    void LoadTable(CatalogTransaction& transaction);
+    void LoadTable(CatalogTransaction& transaction, bool force_reload = true);
 
 public:
 	optional_ptr<CatalogEntry> CreateTable(CatalogTransaction transaction, BoundCreateTableInfo &info) override;
