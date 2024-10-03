@@ -45,8 +45,8 @@ TableFunction DeltaTableEntry::GetScanFunction(ClientContext &context, unique_pt
 
     // Copy over the internal kernel snapshot
     auto function_info = make_shared_ptr<DeltaFunctionInfo>();
-    function_info->snapshot = this->snapshot->snapshot;
-    function_info->expected_path = delta_catalog.GetDBPath();
+
+    function_info->snapshot = this->snapshot;
     delta_scan_function.function_info = std::move(function_info);
 
 	vector<Value> inputs = {delta_catalog.GetDBPath()};

@@ -127,7 +127,7 @@ static unique_ptr<DeltaTableEntry> CreateTableEntry(ClientContext &context, Delt
 void DeltaSchemaEntry::Scan(ClientContext &context, CatalogType type,
                          const std::function<void(CatalogEntry &)> &callback) {
 	if (!CatalogTypeIsSupported(type)) {
-	    CatalogTransaction transaction(this->catalog, context);
+	    auto transaction = catalog.GetCatalogTransaction(context);
 		auto default_table = GetEntry(transaction, type, DEFAULT_DELTA_TABLE);
 	    if (default_table) {
 	        callback(*default_table);
@@ -151,11 +151,11 @@ optional_ptr<CatalogEntry> DeltaSchemaEntry::GetEntry(CatalogTransaction transac
     auto &context = transaction.GetContext();
 
     if (type == CatalogType::TABLE_ENTRY && name == DEFAULT_DELTA_TABLE) {
-        auto &transaction = context.ActiveTransaction().GetTransaction(this->catalog.GetAttached()).Cast<DeltaTransaction>();
+        auto &delta_transaction = GetDeltaTransaction(transaction);
         auto &delta_catalog = catalog.Cast<DeltaCatalog>();
 
-        if (transaction.table_entry) {
-            return *transaction.table_entry;
+        if (delta_transaction.table_entry) {
+            return *delta_transaction.table_entry;
         }
 
         if (delta_catalog.UseCachedSnapshot()) {
@@ -166,9 +166,8 @@ optional_ptr<CatalogEntry> DeltaSchemaEntry::GetEntry(CatalogTransaction transac
             return *cached_table;
         }
 
-        unique_lock<mutex> l(lock);
-        transaction.table_entry = CreateTableEntry(context, delta_catalog, *this);
-        return *transaction.table_entry;
+        delta_transaction.table_entry = CreateTableEntry(context, delta_catalog, *this);
+        return *delta_transaction.table_entry;
     }
 
     return nullptr;

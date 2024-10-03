@@ -30,7 +30,7 @@ public:
 	                           ClientContext &context) override;
 
 public:
-    shared_ptr<const DeltaSnapshot> snapshot;
+    shared_ptr<DeltaSnapshot> snapshot;
 };
 
 } // namespace duckdb

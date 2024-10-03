@@ -389,6 +389,12 @@ string DeltaSnapshot::ToDeltaPath(const string &raw_path) {
 }
 
 void DeltaSnapshot::Bind(vector<LogicalType> &return_types, vector<string> &names) {
+    if (have_bound) {
+        names = this->names;
+        return_types = this->types;
+        return;
+    }
+
     if (!initialized) {
         InitializeFiles();
     }
@@ -405,7 +411,9 @@ void DeltaSnapshot::Bind(vector<LogicalType> &return_types, vector<string> &name
         return_types.push_back(field.second);
     }
     // Store the bound names for resolving the complex filter pushdown later
+    have_bound = true;
     this->names = names;
+    this->types = return_types;
 }
 
 string DeltaSnapshot::GetFile(idx_t i) {
@@ -473,12 +481,19 @@ void DeltaSnapshot::InitializeFiles() {
 unique_ptr<MultiFileList> DeltaSnapshot::ComplexFilterPushdown(ClientContext &context, const MultiFileReaderOptions &options, MultiFilePushdownInfo &info,
                                                vector<unique_ptr<Expression>> &filters) {
     FilterCombiner combiner(context);
+
+    // TODO: can we avoid constructing 2 scans for scans with filter pushdown?
+    if (filters.empty()) {
+        return nullptr;
+    }
+
     for (const auto &filter : filters) {
         combiner.AddFilter(filter->Copy());
     }
     auto filterstmp = combiner.GenerateTableScanFilters(info.column_ids);
 
     // TODO: can/should we figure out if this filtered anything?
+
     auto filtered_list = make_uniq<DeltaSnapshot>(context, paths[0]);
     filtered_list->table_filters = std::move(filterstmp);
     filtered_list->names = names;
@@ -548,8 +563,7 @@ unique_ptr<MultiFileReader> DeltaMultiFileReader::CreateInstance(const TableFunc
     auto result = make_uniq<DeltaMultiFileReader>();
 
     if (table_function.function_info) {
-        result->kernel_snapshot = table_function.function_info->Cast<DeltaFunctionInfo>().snapshot;
-        result->kernel_snapshot_path = table_function.function_info->Cast<DeltaFunctionInfo>().expected_path;
+        result->snapshot = table_function.function_info->Cast<DeltaFunctionInfo>().snapshot;
     }
 
     return std::move(result);
@@ -640,21 +654,18 @@ void DeltaMultiFileReader::FinalizeBind(const MultiFileReaderOptions &file_optio
     }
 }
 
-unique_ptr<MultiFileList> DeltaMultiFileReader::CreateFileList(ClientContext &context, const vector<string>& paths, FileGlobOptions options) {
+shared_ptr<MultiFileList> DeltaMultiFileReader::CreateFileList(ClientContext &context, const vector<string>& paths, FileGlobOptions options) {
     if (paths.size() != 1) {
         throw BinderException("'delta_scan' only supports single path as input");
     }
 
-    if (kernel_snapshot) {
-        if (kernel_snapshot_path != paths[0]) {
-            throw InternalException("Expected path from injected function info did not match! '%s' expected to match '%s'", kernel_snapshot_path, paths[0]);
-        }
+
+    if (snapshot) {
+        // TODO: somehow assert that we are querying the same path as this injected snapshot
 
         // This takes the kernel snapshot from the delta snapshot and ensures we use that snapshot for reading
-        if (kernel_snapshot) {
-            auto snapshot = make_uniq<DeltaSnapshot>(context, paths[0]);
-            snapshot->snapshot = kernel_snapshot;
-            return std::move(snapshot);
+        if (snapshot) {
+            return snapshot;
         }
     }
 

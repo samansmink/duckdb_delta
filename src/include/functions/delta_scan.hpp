@@ -12,9 +12,10 @@
 #include "duckdb/common/multi_file_reader.hpp"
 
 namespace duckdb {
+struct DeltaSnapshot;
 
 struct DeltaFunctionInfo : public TableFunctionInfo {
-    shared_ptr<SharedKernelSnapshot> snapshot;
+    shared_ptr<DeltaSnapshot> snapshot;
     string expected_path;
 };
 
@@ -84,6 +85,8 @@ public:
 
     //! Names
     vector<string> names;
+    vector<LogicalType> types;
+    bool have_bound = false;
 
     //! Metadata map for files
     vector<unique_ptr<DeltaFileMetaData>> metadata;
@@ -111,7 +114,7 @@ struct DeltaMultiFileReaderGlobalState : public MultiFileReaderGlobalState {
 struct DeltaMultiFileReader : public MultiFileReader {
     static unique_ptr<MultiFileReader> CreateInstance(const TableFunction &table_function);
     //! Return a DeltaSnapshot
-    unique_ptr<MultiFileList> CreateFileList(ClientContext &context, const vector<string> &paths,
+    shared_ptr<MultiFileList> CreateFileList(ClientContext &context, const vector<string> &paths,
                    FileGlobOptions options) override;
 
     //! Override the regular parquet bind using the MultiFileReader Bind. The bind from these are what DuckDB's file
@@ -148,11 +151,9 @@ struct DeltaMultiFileReader : public MultiFileReader {
     bool ParseOption(const string &key, const Value &val, MultiFileReaderOptions &options,
                                         ClientContext &context) override;
 
-    // For the TableFunction used on attached delta tables, the kernel snapshot is injected into the MultiFileReader to
-    // ensure the table is read at the correct timestamp
-    shared_ptr<SharedKernelSnapshot> kernel_snapshot;
-    // Path for when kernel_snapshot is set: this multifilereader can then only be used to scan this path
-    string kernel_snapshot_path;
+    // A snapshot can be injected into the multifilereader, this ensures the GetMultiFileList can return this snapshot
+    // (note that the path should match the one passed to CreateFileList)
+    shared_ptr<DeltaSnapshot> snapshot;
 };
 
 } // namespace duckdb
