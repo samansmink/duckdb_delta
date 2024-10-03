@@ -105,17 +105,35 @@ bool CatalogTypeIsSupported(CatalogType type) {
 	}
 }
 
+static unique_ptr<DeltaTableEntry> CreateTableEntry(ClientContext &context, DeltaCatalog &delta_catalog, DeltaSchemaEntry &schema_entry) {
+    auto snapshot = make_shared_ptr<DeltaSnapshot>(context, delta_catalog.GetDBPath());
+
+    // Get the names and types from the delta snapshot
+    vector<LogicalType> return_types;
+    vector<string> names;
+    snapshot->Bind(return_types, names);
+
+    CreateTableInfo table_info;
+    for (idx_t i = 0; i < return_types.size(); i++) {
+        table_info.columns.AddColumn(ColumnDefinition(names[i], return_types[i]));
+    }
+    table_info.table = DEFAULT_DELTA_TABLE;
+    auto table_entry = make_uniq<DeltaTableEntry>(delta_catalog, schema_entry, table_info);
+    table_entry->snapshot = std::move(snapshot);
+
+    return table_entry;
+}
+
 void DeltaSchemaEntry::Scan(ClientContext &context, CatalogType type,
                          const std::function<void(CatalogEntry &)> &callback) {
 	if (!CatalogTypeIsSupported(type)) {
-		return;
+	    CatalogTransaction transaction(this->catalog, context);
+		auto default_table = GetEntry(transaction, type, DEFAULT_DELTA_TABLE);
+	    if (default_table) {
+	        callback(*default_table);
+	    }
 	}
 
-    // LoadTable(context);
-
-    if (table) {
-        callback(*table);
-    }
 }
 void DeltaSchemaEntry::Scan(CatalogType type, const std::function<void(CatalogEntry &)> &callback) {
 	throw NotImplementedException("Scan without context not supported");
@@ -127,49 +145,33 @@ void DeltaSchemaEntry::DropEntry(ClientContext &context, DropInfo &info) {
 
 optional_ptr<CatalogEntry> DeltaSchemaEntry::GetEntry(CatalogTransaction transaction, CatalogType type,
                                                    const string &name) {
-    D_ASSERT(type == CatalogType::TABLE_ENTRY);
+    if (!transaction.HasContext()) {
+        throw NotImplementedException("Can not DeltaSchemaEntry::GetEntry without context");
+    }
+    auto &context = transaction.GetContext();
+
     if (type == CatalogType::TABLE_ENTRY && name == DEFAULT_DELTA_TABLE) {
-
-        LoadTable(transaction);
-
-        return *table;
-    }
-    return nullptr;
-}
-
-void DeltaSchemaEntry::LoadTable(CatalogTransaction &transaction, bool force_reload) {
-    if (!force_reload && table) {
-#ifdef DEBUG
-        //  Confirm that the transaction is looking at the same version of the table
-        auto snapshot = GetDeltaTransaction(transaction).snapshot;
-        if (snapshot && table->snapshot) {
-            D_ASSERT(snapshot.get() == table->snapshot.get());
-        }
-#endif
-        return;
-    }
-
-    auto& delta_transaction = GetDeltaTransaction(transaction);
-
-    // This is the first time we fetch the snapshot during this transaction: we will store this in the transaction
-    // making sure that any subsequent reads of the delta table will see the same snapshot
-    if (!delta_transaction.snapshot) {
+        auto &transaction = context.ActiveTransaction().GetTransaction(this->catalog.GetAttached()).Cast<DeltaTransaction>();
         auto &delta_catalog = catalog.Cast<DeltaCatalog>();
-        delta_transaction.snapshot = make_shared_ptr<DeltaSnapshot>(transaction.GetContext(), delta_catalog.GetDBPath());
+
+        if (transaction.table_entry) {
+            return *transaction.table_entry;
+        }
+
+        if (delta_catalog.UseCachedSnapshot()) {
+            unique_lock<mutex> l(lock);
+            if (!cached_table) {
+                cached_table = CreateTableEntry(context, delta_catalog, *this);
+            }
+            return *cached_table;
+        }
+
+        unique_lock<mutex> l(lock);
+        transaction.table_entry = CreateTableEntry(context, delta_catalog, *this);
+        return *transaction.table_entry;
     }
 
-    // Get the names and types from the delta snapshot
-    vector<LogicalType> return_types;
-    vector<string> names;
-    delta_transaction.snapshot->Bind(return_types, names);
-
-    CreateTableInfo table_info;
-    for (idx_t i = 0; i < return_types.size(); i++) {
-        table_info.columns.AddColumn(ColumnDefinition(names[i], return_types[i]));
-    }
-    table_info.table = DEFAULT_DELTA_TABLE;
-    table = make_uniq<DeltaTableEntry>(catalog, *this, table_info);
-    table->snapshot = delta_transaction.snapshot;
+    return nullptr;
 }
 
 } // namespace duckdb

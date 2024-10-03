@@ -37,6 +37,7 @@ public:
 
 	string path;
 	AccessMode access_mode;
+    bool use_cache;
 
 public:
 	void Initialize(bool load_builtin) override;
@@ -67,6 +68,8 @@ public:
 
 	bool InMemory() override;
 	string GetDBPath() override;
+
+    bool UseCachedSnapshot();
 
 private:
 	void DropSchema(ClientContext &context, DropInfo &info) override;

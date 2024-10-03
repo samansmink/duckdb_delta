@@ -4,6 +4,7 @@
 #include "duckdb/catalog/catalog_entry/index_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/view_catalog_entry.hpp"
 #include "functions/delta_scan.hpp"
+#include "storage/delta_table_entry.hpp"
 
 namespace duckdb {
 

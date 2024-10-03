@@ -14,6 +14,7 @@
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
 #include "duckdb/parser/tableref/table_function_ref.hpp"
 #include "../../duckdb/third_party/catch/catch.hpp"
+#include "functions/delta_scan.hpp"
 
 #include <functional>
 
@@ -23,6 +24,8 @@ DeltaTableEntry::DeltaTableEntry(Catalog &catalog, SchemaCatalogEntry &schema, C
     : TableCatalogEntry(catalog, schema, info) {
 	this->internal = false;
 }
+
+DeltaTableEntry::~DeltaTableEntry() = default;
 
 unique_ptr<BaseStatistics> DeltaTableEntry::GetStatistics(ClientContext &context, column_t column_id) {
 	return nullptr;

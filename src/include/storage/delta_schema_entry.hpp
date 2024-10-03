@@ -19,8 +19,6 @@ public:
 	DeltaSchemaEntry(Catalog &catalog, CreateSchemaInfo &info);
 	~DeltaSchemaEntry() override;
 
-    void LoadTable(CatalogTransaction& transaction, bool force_reload = true);
-
 public:
 	optional_ptr<CatalogEntry> CreateTable(CatalogTransaction transaction, BoundCreateTableInfo &info) override;
 	optional_ptr<CatalogEntry> CreateFunction(CatalogTransaction transaction, CreateFunctionInfo &info) override;
@@ -43,8 +41,10 @@ public:
 	optional_ptr<CatalogEntry> GetEntry(CatalogTransaction transaction, CatalogType type, const string &name) override;
 
 private:
-    // There is only 1 table in a delta catalog.
-    unique_ptr<DeltaTableEntry> table;
+    //! Delta tables may be cached in the SchemaEntry. Since the TableEntry holds the snapshot, this allows sharing a snapshot
+    //! between different scans.
+    unique_ptr<DeltaTableEntry> cached_table;
+    mutex lock;
 };
 
 } // namespace duckdb

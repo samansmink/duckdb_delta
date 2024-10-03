@@ -9,7 +9,7 @@
 namespace duckdb {
 
 DeltaCatalog::DeltaCatalog(AttachedDatabase &db_p, const string &path, AccessMode access_mode)
-    : Catalog(db_p), path(path), access_mode(access_mode) {
+    : Catalog(db_p), path(path), access_mode(access_mode), use_cache(false) {
 }
 
 DeltaCatalog::~DeltaCatalog() = default;
@@ -48,6 +48,10 @@ bool DeltaCatalog::InMemory() {
 
 string DeltaCatalog::GetDBPath() {
 	return path;
+}
+
+bool DeltaCatalog::UseCachedSnapshot() {
+    return use_cache;
 }
 
 DatabaseSize DeltaCatalog::GetDatabaseSize(ClientContext &context) {

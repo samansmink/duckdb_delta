@@ -100,3 +100,26 @@ select utf8 from main.delta_table
 2
 3
 4
+
+statement ok
+USE memory
+
+statement ok
+DROP TABLE main.dt
+
+statement ok
+DETACH dt
+
+# Test the PIN_SNAPSHOT option: the snapshot is now pinned on attaching
+statement ok
+ATTACH '${DAT_PATH}/out/reader_tests/generated/all_primitive_types/delta' as dt (TYPE delta, PIN_SNAPSHOT)
+
+# This query will now reuse
+query I
+select utf8 from dt
+----
+0
+1
+2
+3
+4

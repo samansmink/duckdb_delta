@@ -34,7 +34,7 @@ public:
         throw NotImplementedException("Can not start read-write transaction");
     };
 public:
-    shared_ptr<DeltaSnapshot> snapshot;
+    unique_ptr<DeltaTableEntry> table_entry;
 
 private:
 	//	DeltaConnection connection;

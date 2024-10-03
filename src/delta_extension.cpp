@@ -18,6 +18,12 @@ static unique_ptr<Catalog> DeltaCatalogAttach(StorageExtensionInfo *storage_info
 
     auto res = make_uniq<DeltaCatalog>(db, info.path, access_mode);
 
+    for (const auto& option : info.options) {
+        if (StringUtil::Lower(option.first) == "pin_snapshot") {
+            res->use_cache = option.second.GetValue<bool>();
+        }
+    }
+
     res->SetDefaultTable(DEFAULT_SCHEMA, DEFAULT_DELTA_TABLE);
 
 	return std::move(res);

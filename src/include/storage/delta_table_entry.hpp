@@ -17,6 +17,7 @@ struct DeltaSnapshot;
 class DeltaTableEntry : public TableCatalogEntry {
 public:
 	DeltaTableEntry(Catalog &catalog, SchemaCatalogEntry &schema, CreateTableInfo &info);
+    ~DeltaTableEntry();
 
 public:
 	unique_ptr<BaseStatistics> GetStatistics(ClientContext &context, column_t column_id) override;
@@ -29,7 +30,7 @@ public:
 	                           ClientContext &context) override;
 
 public:
-    shared_ptr<DeltaSnapshot> snapshot;
+    shared_ptr<const DeltaSnapshot> snapshot;
 };
 
 } // namespace duckdb
