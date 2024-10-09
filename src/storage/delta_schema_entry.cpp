@@ -173,4 +173,12 @@ optional_ptr<CatalogEntry> DeltaSchemaEntry::GetEntry(CatalogTransaction transac
     return nullptr;
 }
 
+optional_ptr<DeltaTableEntry> DeltaSchemaEntry::GetCachedTable() {
+    lock_guard<mutex> lck(lock);
+    if (cached_table) {
+        return *cached_table;
+    }
+    return nullptr;
+}
+
 } // namespace duckdb

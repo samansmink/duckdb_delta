@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "delta_schema_entry.hpp"
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/function/table_function.hpp"
 #include "duckdb/common/enums/access_mode.hpp"
@@ -66,10 +67,16 @@ public:
 
 	DatabaseSize GetDatabaseSize(ClientContext &context) override;
 
+    optional_idx GetCatalogVersion(ClientContext &context) override;
+
 	bool InMemory() override;
 	string GetDBPath() override;
 
     bool UseCachedSnapshot();
+
+    DeltaSchemaEntry& GetMainSchema() {
+        return *main_schema;
+    }
 
 private:
 	void DropSchema(ClientContext &context, DropInfo &info) override;

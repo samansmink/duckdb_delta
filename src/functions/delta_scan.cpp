@@ -390,10 +390,12 @@ string DeltaSnapshot::ToDeltaPath(const string &raw_path) {
 
 void DeltaSnapshot::Bind(vector<LogicalType> &return_types, vector<string> &names) {
     if (have_bound) {
+        printf("Bind DeltaSnapshot Cached\n");
         names = this->names;
         return_types = this->types;
         return;
     }
+    printf("Bind DeltaSnapshot Uncached\n");
 
     if (!initialized) {
         InitializeFiles();
@@ -450,6 +452,7 @@ string DeltaSnapshot::GetFile(idx_t i) {
 }
 
 void DeltaSnapshot::InitializeFiles() {
+    printf("InitializeFiles\n");
     auto path_slice = KernelUtils::ToDeltaString(paths[0]);
 
     // Register engine

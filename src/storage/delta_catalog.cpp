@@ -6,6 +6,9 @@
 #include "duckdb/parser/parsed_data/create_schema_info.hpp"
 #include "duckdb/main/attached_database.hpp"
 
+#include "functions/delta_scan.hpp"
+#include "storage/delta_transaction_manager.hpp"
+
 namespace duckdb {
 
 DeltaCatalog::DeltaCatalog(AttachedDatabase &db_p, const string &path, AccessMode access_mode)
@@ -52,6 +55,26 @@ string DeltaCatalog::GetDBPath() {
 
 bool DeltaCatalog::UseCachedSnapshot() {
     return use_cache;
+}
+
+optional_idx DeltaCatalog::GetCatalogVersion(ClientContext &context) {
+    auto &delta_transaction = DeltaTransaction::Get(context, *this);
+
+    // Option 1: snapshot is cached table-wide
+    auto cached_snapshot = main_schema->GetCachedTable();
+    if (cached_snapshot) {
+        printf("Returned Cached Table version: %lld\n", cached_snapshot->snapshot->version);
+        return cached_snapshot->snapshot->version;
+    }
+
+    // Option 2: snapshot is cached in transaction
+    if (delta_transaction.table_entry) {
+        printf("Returned transaction Table version: %lld\n", delta_transaction.table_entry->snapshot->version);
+        return delta_transaction.table_entry->snapshot->version;
+    }
+
+    printf("No catalog version!\n");
+    return optional_idx::Invalid();
 }
 
 DatabaseSize DeltaCatalog::GetDatabaseSize(ClientContext &context) {
