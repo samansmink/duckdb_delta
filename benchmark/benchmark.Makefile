@@ -51,3 +51,10 @@ bench-run-tpcds-sf1-duckdb: bench-output-dir
 
 # COMPARES TPCDS SF1 on parquet file vs on delta files
 bench-run-tpcds-sf1: bench-run-tpcds-sf1-delta bench-run-tpcds-sf1-parquet bench-run-tpcds-sf1-duckdb
+
+###
+# MICRO
+###
+
+bench-run-snapshot-performance: bench-output-dir
+	./build/release/benchmark/benchmark_runner --root-dir './' 'benchmark/micro/snapshot_performance/.*' 2>&1 | tee benchmark_results/snapshot-performance.csv

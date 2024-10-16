@@ -11,7 +11,7 @@ namespace duckdb {
 DeltaTransaction::DeltaTransaction(DeltaCatalog &delta_catalog, TransactionManager &manager, ClientContext &context)
     : Transaction(manager, context), access_mode(delta_catalog.access_mode) {
 	//	connection = DeltaConnection::Open(delta_catalog.path);
-    printf("Started Delta Transaction\n");
+    // printf("Started Delta Transaction\n");
 }
 
 DeltaTransaction::~DeltaTransaction() {

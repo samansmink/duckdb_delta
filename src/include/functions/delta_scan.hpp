@@ -63,8 +63,8 @@ protected:
     string GetFile(idx_t i) override;
 
 protected:
-    // TODO: How to guarantee we only call this after the filter pushdown?
-    void InitializeFiles();
+    void InitializeSnapshot();
+    void InitializeScan();
 
     template <class T>
     T TryUnpackKernelResult(ffi::ExternResult<T> result) {
@@ -92,7 +92,9 @@ public:
     vector<unique_ptr<DeltaFileMetaData>> metadata;
 
     //! Current file list resolution state
-    bool initialized = false;
+    bool initialized_snapshot = false;
+    bool initialized_scan = false;
+
     bool files_exhausted = false;
     vector<string> resolved_files;
     TableFilterSet table_filters;

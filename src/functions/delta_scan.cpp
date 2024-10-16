@@ -357,6 +357,7 @@ static ffi::EngineBuilder* CreateBuilder(ClientContext &context, const string &p
 }
 
 DeltaSnapshot::DeltaSnapshot(ClientContext &context_p, const string &path) : MultiFileList({ToDeltaPath(path)}, FileGlobOptions::ALLOW_EMPTY), context(context_p) {
+    // printf("created snapshot\n");
 }
 
 string DeltaSnapshot::GetPath() {
@@ -390,15 +391,15 @@ string DeltaSnapshot::ToDeltaPath(const string &raw_path) {
 
 void DeltaSnapshot::Bind(vector<LogicalType> &return_types, vector<string> &names) {
     if (have_bound) {
-        printf("Bind DeltaSnapshot Cached\n");
+        // printf("Bind DeltaSnapshot Cached\n");
         names = this->names;
         return_types = this->types;
         return;
     }
-    printf("Bind DeltaSnapshot Uncached\n");
+    // printf("Bind DeltaSnapshot Uncached\n");
 
-    if (!initialized) {
-        InitializeFiles();
+    if (!initialized_snapshot) {
+        InitializeSnapshot();
     }
 
     unique_ptr<SchemaVisitor::FieldList> schema;
@@ -419,9 +420,14 @@ void DeltaSnapshot::Bind(vector<LogicalType> &return_types, vector<string> &name
 }
 
 string DeltaSnapshot::GetFile(idx_t i) {
-    if (!initialized) {
-        InitializeFiles();
+    if (!initialized_snapshot) {
+        InitializeSnapshot();
     }
+
+    if(!initialized_scan) {
+        InitializeScan();
+    }
+
     // We already have this file
     if (i < resolved_files.size()) {
         return resolved_files[i];
@@ -451,17 +457,22 @@ string DeltaSnapshot::GetFile(idx_t i) {
     return resolved_files[i];
 }
 
-void DeltaSnapshot::InitializeFiles() {
-    printf("InitializeFiles\n");
+void DeltaSnapshot::InitializeSnapshot() {
     auto path_slice = KernelUtils::ToDeltaString(paths[0]);
 
-    // Register engine
     auto interface_builder = CreateBuilder(context, paths[0]);
     extern_engine = TryUnpackKernelResult( ffi::builder_build(interface_builder));
 
     if (!snapshot) {
+        // printf("InitializeFiles uncached\n");
         snapshot = make_shared_ptr<SharedKernelSnapshot>(TryUnpackKernelResult(ffi::snapshot(path_slice, extern_engine.get())));
     }
+
+    initialized_snapshot = true;
+}
+
+void DeltaSnapshot::InitializeScan() {
+    // printf("InitializeScan\n");
 
     auto snapshot_ref = snapshot->GetLockingRef();
 
@@ -478,7 +489,7 @@ void DeltaSnapshot::InitializeFiles() {
     // Create scan data iterator
     scan_data_iterator = TryUnpackKernelResult(ffi::kernel_scan_data_init(extern_engine.get(), scan.get()));
 
-    initialized = true;
+    initialized_scan = true;
 }
 
 unique_ptr<MultiFileList> DeltaSnapshot::ComplexFilterPushdown(ClientContext &context, const MultiFileReaderOptions &options, MultiFilePushdownInfo &info,
@@ -496,7 +507,6 @@ unique_ptr<MultiFileList> DeltaSnapshot::ComplexFilterPushdown(ClientContext &co
     auto filterstmp = combiner.GenerateTableScanFilters(info.column_ids);
 
     // TODO: can/should we figure out if this filtered anything?
-
     auto filtered_list = make_uniq<DeltaSnapshot>(context, paths[0]);
     filtered_list->table_filters = std::move(filterstmp);
     filtered_list->names = names;
@@ -517,6 +527,8 @@ vector<string> DeltaSnapshot::GetAllFiles() {
 }
 
 FileExpandResult DeltaSnapshot::GetExpandResult() {
+    return FileExpandResult::MULTIPLE_FILES;
+
     // GetFile(1) will ensure at least the first 2 files are expanded if they are available
     GetFile(1);
 
