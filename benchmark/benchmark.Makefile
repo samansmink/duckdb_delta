@@ -26,6 +26,8 @@ plot:
 # TPCH SF1 on delta table
 bench-run-tpch-sf1-delta: bench-output-dir
 	./build/release/benchmark/benchmark_runner --root-dir './' 'benchmark/tpch/sf1/local/delta/$(BENCHMARK_PATTERN)' 2>&1 | tee benchmark_results/tpch-sf1-delta.csv
+bench-run-tpch-sf1-delta-attach: bench-output-dir
+	./build/release/benchmark/benchmark_runner --root-dir './' 'benchmark/tpch/sf1/local/delta_attach/$(BENCHMARK_PATTERN)' 2>&1 | tee benchmark_results/tpch-sf1-delta-attach.csv
 # TPCH SF1 on parquet files
 bench-run-tpch-sf1-parquet: bench-output-dir
 	./build/release/benchmark/benchmark_runner 'benchmark/tpch/sf1-parquet/$(BENCHMARK_PATTERN)' 2>&1 | tee benchmark_results/tpch-sf1-parquet.csv
@@ -42,6 +44,8 @@ bench-run-tpch-sf1: bench-run-tpch-sf1-delta bench-run-tpch-sf1-parquet
 # TPCDS SF1 on delta table
 bench-run-tpcds-sf1-delta: bench-output-dir
 	./build/release/benchmark/benchmark_runner --root-dir './' 'benchmark/tpcds/sf1/$(IO_MODE)/delta/$(BENCHMARK_PATTERN)' 2>&1 | tee benchmark_results/tpcds-sf1-delta-$(IO_MODE).csv
+bench-run-tpcds-sf1-delta-attach: bench-output-dir
+	./build/release/benchmark/benchmark_runner --root-dir './' 'benchmark/tpcds/sf1/$(IO_MODE)/delta_attach/$(BENCHMARK_PATTERN)' 2>&1 | tee benchmark_results/tpcds-sf1-delta-attach-$(IO_MODE).csv
 # TPCDS SF1 on parquet files
 bench-run-tpcds-sf1-parquet: bench-output-dir
 	./build/release/benchmark/benchmark_runner --root-dir './' 'benchmark/tpcds/sf1/$(IO_MODE)/parquet/$(BENCHMARK_PATTERN)' 2>&1 | tee benchmark_results/tpcds-sf1-parquet-$(IO_MODE).csv
