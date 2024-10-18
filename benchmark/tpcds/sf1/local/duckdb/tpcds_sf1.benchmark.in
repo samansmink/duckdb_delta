@@ -10,10 +10,12 @@ require delta
 
 require parquet
 
+require httpfs
+
 require tpcds
 
 run
-attach './data/generated/tpcds_sf1/duckdb.db' as tpcds;
+attach 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/duckdb.db' as tpcds;
 use tpcds;
 pragma tpcds(${QUERY_NUMBER})
 
