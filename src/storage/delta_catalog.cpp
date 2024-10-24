@@ -63,17 +63,15 @@ optional_idx DeltaCatalog::GetCatalogVersion(ClientContext &context) {
     // Option 1: snapshot is cached table-wide
     auto cached_snapshot = main_schema->GetCachedTable();
     if (cached_snapshot) {
-        // printf("Returned Cached Table version: %lld\n", cached_snapshot->snapshot->version);
         return cached_snapshot->snapshot->version;
     }
 
     // Option 2: snapshot is cached in transaction
     if (delta_transaction.table_entry) {
-        // printf("Returned transaction Table version: %lld\n", delta_transaction.table_entry->snapshot->version);
         return delta_transaction.table_entry->snapshot->version;
     }
 
-    // printf("No catalog version!\n");
+    // FIXME: this is not allowed
     return optional_idx::Invalid();
 }
 

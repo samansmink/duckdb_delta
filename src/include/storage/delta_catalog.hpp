@@ -16,14 +16,6 @@
 namespace duckdb {
 class DeltaSchemaEntry;
 
-struct DeltaCredentials {
-	string endpoint;
-	string token;
-
-	// Not really part of the credentials, but required to query s3 tables
-	string aws_region;
-};
-
 class DeltaClearCacheFunction : public TableFunction {
 public:
 	DeltaClearCacheFunction();

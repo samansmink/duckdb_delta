@@ -32,9 +32,7 @@ void DeltaTransactionManager::RollbackTransaction(Transaction &transaction) {
 }
 
 void DeltaTransactionManager::Checkpoint(ClientContext &context, bool force) {
-	// auto &transaction = DeltaTransaction::Get(context, db.GetCatalog());
-	//	auto &db = transaction.GetConnection();
-	//	db.Execute("CHECKPOINT");
+	// NOP
 }
 
 } // namespace duckdb

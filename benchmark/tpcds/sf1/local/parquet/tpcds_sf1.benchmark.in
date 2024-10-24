@@ -10,8 +10,6 @@ require delta
 
 require parquet
 
-require httpfs
-
 load benchmark/tpcds/sf1/local/parquet/load.sql
 
 run duckdb/extension/tpcds/dsdgen/queries/${QUERY_NUMBER_PADDED}.sql

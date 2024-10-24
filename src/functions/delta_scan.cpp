@@ -357,7 +357,6 @@ static ffi::EngineBuilder* CreateBuilder(ClientContext &context, const string &p
 }
 
 DeltaSnapshot::DeltaSnapshot(ClientContext &context_p, const string &path) : MultiFileList({ToDeltaPath(path)}, FileGlobOptions::ALLOW_EMPTY), context(context_p) {
-    // printf("created snapshot\n");
 }
 
 string DeltaSnapshot::GetPath() {
@@ -391,12 +390,10 @@ string DeltaSnapshot::ToDeltaPath(const string &raw_path) {
 
 void DeltaSnapshot::Bind(vector<LogicalType> &return_types, vector<string> &names) {
     if (have_bound) {
-        // printf("Bind DeltaSnapshot Cached\n");
         names = this->names;
         return_types = this->types;
         return;
     }
-    // printf("Bind DeltaSnapshot Uncached\n");
 
     if (!initialized_snapshot) {
         InitializeSnapshot();
@@ -464,7 +461,6 @@ void DeltaSnapshot::InitializeSnapshot() {
     extern_engine = TryUnpackKernelResult( ffi::builder_build(interface_builder));
 
     if (!snapshot) {
-        // printf("InitializeFiles uncached\n");
         snapshot = make_shared_ptr<SharedKernelSnapshot>(TryUnpackKernelResult(ffi::snapshot(path_slice, extern_engine.get())));
     }
 
@@ -472,8 +468,6 @@ void DeltaSnapshot::InitializeSnapshot() {
 }
 
 void DeltaSnapshot::InitializeScan() {
-    // printf("InitializeScan\n");
-
     auto snapshot_ref = snapshot->GetLockingRef();
 
     // Create Scan
@@ -496,7 +490,6 @@ unique_ptr<MultiFileList> DeltaSnapshot::ComplexFilterPushdown(ClientContext &co
                                                vector<unique_ptr<Expression>> &filters) {
     FilterCombiner combiner(context);
 
-    // TODO: can we avoid constructing 2 scans for scans with filter pushdown?
     if (filters.empty()) {
         return nullptr;
     }
@@ -676,7 +669,7 @@ shared_ptr<MultiFileList> DeltaMultiFileReader::CreateFileList(ClientContext &co
 
 
     if (snapshot) {
-        // TODO: somehow assert that we are querying the same path as this injected snapshot
+        // TODO: assert that we are querying the same path as this injected snapshot
 
         // This takes the kernel snapshot from the delta snapshot and ensures we use that snapshot for reading
         if (snapshot) {
