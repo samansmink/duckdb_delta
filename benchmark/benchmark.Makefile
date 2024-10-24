@@ -35,7 +35,7 @@ bench-run-tpch-sf1-parquet: bench-output-dir
 bench-run-tpch-sf1-duckdb: bench-output-dir
 	./build/release/benchmark/benchmark_runner --root-dir './' 'benchmark/tpch/sf1/local/duckdb/$(BENCHMARK_PATTERN)' 2>&1 | tee benchmark_results/tpch-sf1-duckdb.csv
 # COMPARES TPCH SF1 on parquet file vs on delta files vs on duckdb files
-bench-run-tpch-sf1: bench-run-tpch-sf1-delta bench-run-tpch-sf1-parquet
+bench-run-tpch-sf1: bench-run-tpch-sf1-delta bench-run-tpch-sf1-parquet bench-run-tpch-sf1-attach
 
 ###
 # TPCDS
@@ -56,7 +56,7 @@ bench-run-tpcds-sf1-duckdb: bench-output-dir
 	./build/release/benchmark/benchmark_runner --root-dir './' 'benchmark/tpcds/sf1/$(IO_MODE)/duckdb/$(BENCHMARK_PATTERN)' 2>&1 | tee benchmark_results/tpcds-sf1-duckdb-$(IO_MODE).csv
 
 # COMPARES TPCDS SF1 on parquet file vs on delta files
-bench-run-tpcds-sf1: bench-run-tpcds-sf1-delta bench-run-tpcds-sf1-parquet bench-run-tpcds-sf1-duckdb
+bench-run-tpcds-sf1: bench-run-tpcds-sf1-delta bench-run-tpcds-sf1-parquet bench-run-tpcds-sf1-duckdb bench-run-tpcds-sf1-delta-attach bench-run-tpcds-sf1-delta-attach-pin
 
 ###
 # MICRO
