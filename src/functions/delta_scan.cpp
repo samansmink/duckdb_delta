@@ -520,18 +520,11 @@ vector<string> DeltaSnapshot::GetAllFiles() {
 }
 
 FileExpandResult DeltaSnapshot::GetExpandResult() {
+    // We avoid exposing the ExpandResult to DuckDB here because we want to materialize the Snapshot as late as possible:
+    // materializing too early (GetExpandResult is called *before* filter pushdown by the Parquet scanner), will lead into
+    // needing to create 2 scans of the snapshot TODO: we need to investigate if this is actually a sensible decision with
+    // some benchmarking, its currently based on intuition.
     return FileExpandResult::MULTIPLE_FILES;
-
-    // GetFile(1) will ensure at least the first 2 files are expanded if they are available
-    GetFile(1);
-
-    if (resolved_files.size() > 1) {
-        return FileExpandResult::MULTIPLE_FILES;
-    } else if (resolved_files.size() == 1) {
-        return FileExpandResult::SINGLE_FILE;
-    }
-
-    return FileExpandResult::NO_FILES;
 }
 
 idx_t DeltaSnapshot::GetTotalFileCount() {
@@ -670,7 +663,6 @@ shared_ptr<MultiFileList> DeltaMultiFileReader::CreateFileList(ClientContext &co
 
     if (snapshot) {
         // TODO: assert that we are querying the same path as this injected snapshot
-
         // This takes the kernel snapshot from the delta snapshot and ensures we use that snapshot for reading
         if (snapshot) {
             return snapshot;
