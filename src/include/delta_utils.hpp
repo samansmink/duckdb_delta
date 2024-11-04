@@ -14,10 +14,10 @@
 namespace duckdb {
 
 class ExpressionVisitor : public ffi::EngineExpressionVisitor {
-    using FieldList = vector<unique_ptr<BaseExpression>>;
+    using FieldList = vector<unique_ptr<ParsedExpression>>;
 
 public:
-    unique_ptr<vector<unique_ptr<BaseExpression>>> VisitKernelExpression(const ffi::Handle<ffi::SharedExpression>* expression);
+    unique_ptr<vector<unique_ptr<ParsedExpression>>> VisitKernelExpression(const ffi::Handle<ffi::SharedExpression>* expression);
 
 private:
     unordered_map<uintptr_t, unique_ptr<FieldList>> inflight_lists;
@@ -41,7 +41,9 @@ private:
     static void VisitBinaryLiteral(void* state, uintptr_t sibling_list_id, const uint8_t *buffer, uintptr_t len);
     static void VisitNullLiteral(void* state, uintptr_t sibling_list_id);
     static void VisitArrayLiteral(void* state, uintptr_t sibling_list_id, uintptr_t child_id);
-    static void VisitColumnExpression(void *data, uintptr_t sibling_list_id, ffi::KernelStringSlice name);
+    static void VisitStructLiteral(void *data, uintptr_t sibling_list_id, uintptr_t child_field_list_value, uintptr_t child_value_list_id);
+    static void VisitDecimalLiteral(void *state, uintptr_t sibling_list_id, uint64_t value_ms, uint64_t value_ls, uint8_t precision, uint8_t scale);
+    static void VisitColumnExpression(void *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name);
     static void VisitStructExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
 
     template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME>
@@ -61,17 +63,26 @@ private:
         auto state_cast = static_cast<ExpressionVisitor*>(state);
 
         auto children = state_cast->TakeFieldList(child_list_id);
+
         if (EXPECTED_CHILDREN != -1) {
             D_ASSERT(children->size() == EXPECTED_CHILDREN);
         }
 
-        auto expression = EXPRESSION_TYPENAME(EXPRESSION_TYPE, children);
-        state_cast->AppendToList(sibling_list_id, std::move(expression));
+        if (EXPECTED_CHILDREN == 2) {
+            auto &lhs = children->at(0);
+            auto &rhs = children->at(1);
+            unique_ptr<ParsedExpression> expression = make_uniq<EXPRESSION_TYPENAME>(EXPRESSION_TYPE, std::move(lhs), std::move(rhs));
+            state_cast->AppendToList(sibling_list_id, std::move(expression));
+        } else {
+            unique_ptr<ParsedExpression> expression = make_uniq<EXPRESSION_TYPENAME>(EXPRESSION_TYPE, std::move(*children));
+            state_cast->AppendToList(sibling_list_id, std::move(expression));
+        }
+
     }
 
     // List functions
     static uintptr_t MakeFieldList(ExpressionVisitor* state, uintptr_t capacity_hint);
-    void AppendToList(uintptr_t id, unique_ptr<BaseExpression> child);
+    void AppendToList(uintptr_t id, unique_ptr<ParsedExpression> child);
     uintptr_t MakeFieldListImpl(uintptr_t capacity_hint);
     unique_ptr<FieldList> TakeFieldList(uintptr_t id);
 };

@@ -4,10 +4,11 @@
 #include "duckdb/main/extension_util.hpp"
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 #include <duckdb/planner/filter/null_filter.hpp>
+#include "duckdb/parser/expression/conjunction_expression.hpp"
 
 namespace duckdb {
 
-unique_ptr<vector<unique_ptr<BaseExpression>>> ExpressionVisitor::VisitKernelExpression(const ffi::Handle<ffi::SharedExpression> *expression) {
+unique_ptr<vector<unique_ptr<ParsedExpression>>> ExpressionVisitor::VisitKernelExpression(const ffi::Handle<ffi::SharedExpression> *expression) {
     ExpressionVisitor state;
     ffi::EngineExpressionVisitor visitor;
 
@@ -37,27 +38,27 @@ unique_ptr<vector<unique_ptr<BaseExpression>>> ExpressionVisitor::VisitKernelExp
     visitor.visit_and = VisitBinaryExpression<ExpressionType::CONJUNCTION_AND, ConjunctionExpression>();
     visitor.visit_or = VisitBinaryExpression<ExpressionType::CONJUNCTION_OR, ConjunctionExpression>();
 
-    visitor.visit_lt = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
-    visitor.visit_le = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHANOREQUALTO, ComparisonExpression>();
-    visitor.visit_gt = VisitBinaryExpression<ExpressionType::COMPARE_GREATERTHAN, ComparisonExpression>();
-    visitor.visit_ge = VisitBinaryExpression<ExpressionType::COMPARE_GREATERTHANOREQUALTO, ComparisonExpression>();
-
-    visitor.visit_ne = VisitBinaryExpression<ExpressionType::COMPARE_NOTEQUAL, ComparisonExpression>();
-    visitor.visit_distinct = VisitBinaryExpression<ExpressionType::COMPARE_DISTINCT_FROM, ComparisonExpression>();
-
-    visitor.visit_in = VisitBinaryExpression<ExpressionType::COMPARE_IN, ComparisonExpression>();
-    visitor.visit_not_in = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
-
-    // TODO fix these
-    visitor.visit_add = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
-    visitor.visit_minus = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
-    visitor.visit_multiply = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
-    visitor.visit_divide = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
+    // visitor.visit_lt = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
+    // visitor.visit_le = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHANOREQUALTO, ComparisonExpression>();
+    // visitor.visit_gt = VisitBinaryExpression<ExpressionType::COMPARE_GREATERTHAN, ComparisonExpression>();
+    // visitor.visit_ge = VisitBinaryExpression<ExpressionType::COMPARE_GREATERTHANOREQUALTO, ComparisonExpression>();
+    //
+    // visitor.visit_ne = VisitBinaryExpression<ExpressionType::COMPARE_NOTEQUAL, ComparisonExpression>();
+    // visitor.visit_distinct = VisitBinaryExpression<ExpressionType::COMPARE_DISTINCT_FROM, ComparisonExpression>();
+    //
+    // visitor.visit_in = VisitBinaryExpression<ExpressionType::COMPARE_IN, ComparisonExpression>();
+    // visitor.visit_not_in = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
+    //
+    // // TODO fix these
+    // visitor.visit_add = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
+    // visitor.visit_minus = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
+    // visitor.visit_multiply = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
+    // visitor.visit_divide = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
 
     visitor.visit_column = &VisitColumnExpression;
     visitor.visit_struct_expr = &VisitStructExpression;
 
-    visitor.visit_literal_struct = &Visit;
+    visitor.visit_literal_struct = &VisitStructLiteral;
 
     uintptr_t result = visit_expression(expression, &visitor);
     return state.TakeFieldList(result);
@@ -93,6 +94,18 @@ void ExpressionVisitor::VisitNullLiteral(void* state, uintptr_t sibling_list_id)
 void ExpressionVisitor::VisitArrayLiteral(void* state, uintptr_t sibling_list_id, uintptr_t child_id) {
     throw NotImplementedException("ExpressionVisitor::VisitArrayLiteral");
 }
+void ExpressionVisitor::VisitStructLiteral(void *data, uintptr_t sibling_list_id, uintptr_t child_field_list_value, uintptr_t child_value_list_id) {
+    throw NotImplementedException("ExpressionVisitor::VisitStructLiteral");
+}
+
+// TODO: double check implementation
+void ExpressionVisitor::VisitDecimalLiteral(void *state, uintptr_t sibling_list_id, uint64_t value_ms, uint64_t value_ls, uint8_t precision, uint8_t scale) {
+    auto expression = make_uniq<ConstantExpression>(Value::DECIMAL({(int64_t)value_ms, value_ls}, precision, scale));
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
+
+    throw NotImplementedException("ExpressionVisitor::VisitStructLiteral");
+}
+
 // TODO: same as string
 void ExpressionVisitor::VisitColumnExpression(void *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name) {
     auto expression = make_uniq<ColumnRefExpression>(string(name.ptr, name.len));
@@ -115,7 +128,7 @@ uintptr_t ExpressionVisitor::MakeFieldListImpl(uintptr_t capacity_hint) {
     return id;
 }
 
-void ExpressionVisitor::AppendToList(uintptr_t id, unique_ptr<BaseExpression> child) {
+void ExpressionVisitor::AppendToList(uintptr_t id, unique_ptr<ParsedExpression> child) {
     auto it = inflight_lists.find(id);
     if (it == inflight_lists.end()) {
         throw InternalException("ExpressionVisitor::AppendToList");
