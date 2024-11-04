@@ -4,12 +4,77 @@
 #include "duckdb/planner/filter/constant_filter.hpp"
 #include "duckdb/planner/filter/conjunction_filter.hpp"
 #include "duckdb/common/enum_util.hpp"
+#include "duckdb/planner/expression.hpp"
 #include <iostream>
+#include "duckdb/parser/expression/constant_expression.hpp"
 #include <duckdb/planner/filter/null_filter.hpp>
 
 // TODO: clean up this file as we go
 
 namespace duckdb {
+
+class ExpressionVisitor : public ffi::EngineExpressionVisitor {
+    using FieldList = vector<unique_ptr<BaseExpression>>;
+
+public:
+    unique_ptr<vector<unique_ptr<BaseExpression>>> VisitKernelExpression(const ffi::Handle<ffi::SharedExpression>* expression);
+
+private:
+    unordered_map<uintptr_t, unique_ptr<FieldList>> inflight_lists;
+    uintptr_t next_id = 1;
+
+    // Literals
+    template <typename CPP_TYPE, Value (*CREATE_VALUE_FUN)(CPP_TYPE)>
+    static ffi::VisitLiteralFn<CPP_TYPE> VisitPrimitiveLiteral() {
+        return (ffi::VisitLiteralFn<CPP_TYPE>) &VisitPrimitiveLiteral<CPP_TYPE, CREATE_VALUE_FUN>;
+    }
+    template <typename CPP_TYPE, typename CREATE_VALUE_FUN>
+    static void VisitPrimitiveLiteral(ExpressionVisitor* state, uintptr_t sibling_list_id, CPP_TYPE value) {
+        auto duckdb_value = CREATE_VALUE_FUN(value);
+        auto expression = make_uniq<ConstantExpression>(duckdb_value);
+        state->AppendToList(sibling_list_id, std::move(expression));
+    }
+    static void VisitTimestampLiteral(void* state, uintptr_t sibling_list_id, int64_t value);
+    static void VisitTimestampNtzLiteral(void* state, uintptr_t sibling_list_id, int64_t value);
+    static void VisitDateLiteral(void* state, uintptr_t sibling_list_id, int32_t value);
+    static void VisitStringLiteral(void* state, uintptr_t sibling_list_id, ffi::KernelStringSlice value);
+    static void VisitBinaryLiteral(void* state, uintptr_t sibling_list_id, const uint8_t *buffer, uintptr_t len);
+    static void VisitNullLiteral(void* state, uintptr_t sibling_list_id);
+    static void VisitArrayLiteral(void* state, uintptr_t sibling_list_id, uintptr_t child_id);
+    static void VisitColumnExpression(void *data, uintptr_t sibling_list_id, ffi::KernelStringSlice name);
+    static void VisitStructExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
+
+    template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME>
+    static ffi::VisitVariadicFn VisitUnaryExpression() {
+        return (ffi::VisitVariadicFn) &VisitVariadicExpression<EXPRESSION_TYPE, EXPRESSION_TYPENAME, 1>;
+    }
+    template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME>
+    static ffi::VisitVariadicFn VisitBinaryExpression() {
+        return (ffi::VisitVariadicFn) &VisitVariadicExpression<EXPRESSION_TYPE, EXPRESSION_TYPENAME, 2>;
+    }
+    template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME, int32_t EXPECTED_CHILDREN = -1>
+    static ffi::VisitVariadicFn VisitVariadicExpression() {
+        return (ffi::VisitVariadicFn) &VisitVariadicExpression<EXPRESSION_TYPE, EXPRESSION_TYPENAME>;
+    }
+    template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME, int32_t EXPECTED_CHILDREN = -1>
+    static void VisitVariadicExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+        auto state_cast = static_cast<ExpressionVisitor*>(state);
+
+        auto children = state_cast->TakeFieldList(child_list_id);
+        if (EXPECTED_CHILDREN != -1) {
+            D_ASSERT(children->size() == EXPECTED_CHILDREN);
+        }
+
+        auto expression = EXPRESSION_TYPENAME(EXPRESSION_TYPE, children);
+        state_cast->AppendToList(sibling_list_id, std::move(expression));
+    }
+
+    // List functions
+    static uintptr_t MakeFieldList(ExpressionVisitor* state, uintptr_t capacity_hint);
+    void AppendToList(uintptr_t id, unique_ptr<BaseExpression> child);
+    uintptr_t MakeFieldListImpl(uintptr_t capacity_hint);
+    unique_ptr<FieldList> TakeFieldList(uintptr_t id);
+};
 
 // SchemaVisitor is used to parse the schema of a Delta table from the Kernel
 class SchemaVisitor {

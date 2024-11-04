@@ -14,4 +14,13 @@ vector<TableFunctionSet> DeltaFunctions::GetTableFunctions(DatabaseInstance &ins
     return functions;
 }
 
+vector<ScalarFunctionSet> DeltaFunctions::GetScalarFunctions(DatabaseInstance &instance) {
+    vector<ScalarFunctionSet> functions;
+
+    functions.push_back(GetExpressionFunction(instance));
+
+    return functions;
+}
+
+
 };
