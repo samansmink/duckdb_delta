@@ -89,6 +89,12 @@ private:
         unique_ptr<ParsedExpression> expression = make_uniq<EXPRESSION_TYPENAME>(EXPRESSION_TYPE, std::move(*children));
         state_cast->AppendToList(sibling_list_id, std::move(expression));
     }
+
+    static void VisitAdditionExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
+    static void VisitSubctractionExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
+    static void VisitDivideExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
+    static void VisitMultiplyExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
+
     template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME>
     static void VisitBinaryExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
         printf("Called into %s\n", EnumUtil::ToString(EXPRESSION_TYPE).c_str());

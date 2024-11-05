@@ -8,6 +8,8 @@
 #include <duckdb/planner/filter/null_filter.hpp>
 #include "duckdb/parser/expression/conjunction_expression.hpp"
 #include "duckdb/parser/expression/comparison_expression.hpp"
+#include "duckdb/parser/expression/function_expression.hpp"
+#include "duckdb/parser/expression/operator_expression.hpp"
 #include "duckdb/common/types/decimal.hpp"
 
 
@@ -68,14 +70,14 @@ unique_ptr<vector<unique_ptr<ParsedExpression>>> ExpressionVisitor::VisitKernelE
     visitor.visit_ne = VisitBinaryExpression<ExpressionType::COMPARE_NOTEQUAL, ComparisonExpression>();
     visitor.visit_distinct = VisitBinaryExpression<ExpressionType::COMPARE_DISTINCT_FROM, ComparisonExpression>();
 
-    visitor.visit_in = VisitBinaryExpression<ExpressionType::COMPARE_IN, ComparisonExpression>();
-    visitor.visit_not_in = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
+    visitor.visit_in = VisitVariadicExpression<ExpressionType::COMPARE_IN, OperatorExpression>();
+    visitor.visit_not_in = VisitVariadicExpression<ExpressionType::COMPARE_NOT_IN, OperatorExpression>();
     //
     // // TODO fix these
-    visitor.visit_add = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
-    visitor.visit_minus = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
-    visitor.visit_multiply = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
-    visitor.visit_divide = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
+    visitor.visit_add = VisitAdditionExpression;
+    visitor.visit_minus = VisitSubctractionExpression;
+    visitor.visit_multiply = VisitMultiplyExpression;
+    visitor.visit_divide = VisitDivideExpression;
 
     visitor.visit_column = &VisitColumnExpression;
     visitor.visit_struct_expr = &VisitStructExpression;
@@ -92,6 +94,51 @@ unique_ptr<vector<unique_ptr<ParsedExpression>>> ExpressionVisitor::VisitKernelE
     }
 
     return state.TakeFieldList(result);
+}
+
+void ExpressionVisitor::VisitAdditionExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+    printf("VisitAdditionExpression\n");
+    auto state_cast = static_cast<ExpressionVisitor*>(state);
+    auto children = state_cast->TakeFieldList(child_list_id);
+    if (!children) {
+        return;
+    }
+
+    unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("+", std::move(*children), nullptr, nullptr, false, true);
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
+}
+
+void ExpressionVisitor::VisitSubctractionExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+    printf("VisitSubctractionExpression\n");
+    auto state_cast = static_cast<ExpressionVisitor*>(state);
+    auto children = state_cast->TakeFieldList(child_list_id);
+    if (!children) {
+        return;
+    }
+    unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("-", std::move(*children), nullptr, nullptr, false, true);
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
+}
+
+void ExpressionVisitor::VisitDivideExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+    printf("VisitDivideExpression\n");
+    auto state_cast = static_cast<ExpressionVisitor*>(state);
+    auto children = state_cast->TakeFieldList(child_list_id);
+    if (!children) {
+        return;
+    }
+    unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("/", std::move(*children), nullptr, nullptr, false, true);
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
+}
+
+void ExpressionVisitor::VisitMultiplyExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+    printf("VisitMultiplyExpression\n");
+    auto state_cast = static_cast<ExpressionVisitor*>(state);
+    auto children = state_cast->TakeFieldList(child_list_id);
+    if (!children) {
+        return;
+    }
+    unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("*", std::move(*children), nullptr, nullptr, false, true);
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
 
 void ExpressionVisitor::VisitPrimitiveLiteralBool(void* state, uintptr_t sibling_list_id, bool value) {
@@ -165,25 +212,62 @@ void ExpressionVisitor::VisitNullLiteral(void* state, uintptr_t sibling_list_id)
 }
 void ExpressionVisitor::VisitArrayLiteral(void* state, uintptr_t sibling_list_id, uintptr_t child_id) {
     printf("VisitArrayLiteral\n");
-    // throw NotImplementedException("ExpressionVisitor::VisitArrayLiteral");
-    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
+    auto state_cast = static_cast<ExpressionVisitor*>(state);
+    auto children = state_cast->TakeFieldList(child_id);
+    if (!children) {
+        return;
+    }
+    unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("list_value", std::move(*children));
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
+
 void ExpressionVisitor::VisitStructLiteral(void *state, uintptr_t sibling_list_id, uintptr_t child_field_list_value, uintptr_t child_value_list_id) {
-    // throw NotImplementedException("ExpressionVisitor::VisitStructLiteral");
     printf("VisitStructLiteral\n");
-    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
+    auto state_cast = static_cast<ExpressionVisitor*>(state);
+
+    // Fixme: this is reverse
+    auto children_keys = state_cast->TakeFieldList(child_field_list_value);
+    auto children_values = state_cast->TakeFieldList(child_value_list_id);
+    if (!children_values || !children_keys) {
+        return;
+    }
+
+    if (children_values->size() != children_keys->size()) {
+        state_cast->error = ErrorData("Size of Keys and Values vector do not match in ExpressionVisitor::VisitStructLiteral");
+        return;
+    }
+
+    for (idx_t i = 0; i < children_keys->size(); i++) {
+        printf("Key: %s Value: %s\n", (*children_keys)[i]->ToString().c_str(), (*children_values)[i]->ToString().c_str());
+        (*children_values)[i]->alias = (*children_keys)[i]->ToString();
+    }
+
+    unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("struct_pack", std::move(*children_values));
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
 
 void ExpressionVisitor::VisitNotExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
-    // throw NotImplementedException("ExpressionVisitor::VisitStructLiteral");
     printf("VisitNotExpression\n");
-    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
+    auto state_cast = static_cast<ExpressionVisitor*>(state);
+    auto children = state_cast->TakeFieldList(child_list_id);
+    if (!children) {
+        return;
+    }
+    unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("NOT", std::move(*children), nullptr, nullptr, false, true);
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
 
 void ExpressionVisitor::VisitIsNullExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
-    // throw NotImplementedException("ExpressionVisitor::VisitStructLiteral");
-    printf("VisitIsNullExpression\n");
-    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
+    printf("VisitNotExpression\n");
+    auto state_cast = static_cast<ExpressionVisitor*>(state);
+    auto children = state_cast->TakeFieldList(child_list_id);
+    if (!children) {
+        return;
+    }
+
+    children->push_back(make_uniq<ConstantExpression>(Value()));
+    unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("IS", std::move(*children), nullptr, nullptr, false, true);
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
 
 // FIXME: How does this work? Why are both value_ms and value_ls 1?
