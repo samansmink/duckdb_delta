@@ -7,6 +7,9 @@
 #include "duckdb/planner/expression.hpp"
 #include <iostream>
 #include "duckdb/parser/expression/constant_expression.hpp"
+#include "duckdb/parser/expression/conjunction_expression.hpp"
+#include "duckdb/common/error_data.hpp"
+#include "duckdb/parser/expression/comparison_expression.hpp"
 #include <duckdb/planner/filter/null_filter.hpp>
 
 // TODO: clean up this file as we go
@@ -23,17 +26,30 @@ private:
     unordered_map<uintptr_t, unique_ptr<FieldList>> inflight_lists;
     uintptr_t next_id = 1;
 
+    ErrorData error;
+
+
     // Literals
     template <typename CPP_TYPE, Value (*CREATE_VALUE_FUN)(CPP_TYPE)>
     static ffi::VisitLiteralFn<CPP_TYPE> VisitPrimitiveLiteral() {
         return (ffi::VisitLiteralFn<CPP_TYPE>) &VisitPrimitiveLiteral<CPP_TYPE, CREATE_VALUE_FUN>;
     }
     template <typename CPP_TYPE, typename CREATE_VALUE_FUN>
-    static void VisitPrimitiveLiteral(ExpressionVisitor* state, uintptr_t sibling_list_id, CPP_TYPE value) {
+    static void VisitPrimitiveLiteral(void* state, uintptr_t sibling_list_id, CPP_TYPE value) {
+        auto state_cast = static_cast<ExpressionVisitor*>(state);
         auto duckdb_value = CREATE_VALUE_FUN(value);
         auto expression = make_uniq<ConstantExpression>(duckdb_value);
-        state->AppendToList(sibling_list_id, std::move(expression));
+        state_cast->AppendToList(sibling_list_id, std::move(expression));
     }
+
+    static void VisitPrimitiveLiteralBool(void* state, uintptr_t sibling_list_id, bool value);
+    static void VisitPrimitiveLiteralByte(void* state, uintptr_t sibling_list_id, int8_t value);
+    static void VisitPrimitiveLiteralShort(void* state, uintptr_t sibling_list_id, int16_t value);
+    static void VisitPrimitiveLiteralInt(void* state, uintptr_t sibling_list_id, int32_t value);
+    static void VisitPrimitiveLiteralLong(void* state, uintptr_t sibling_list_id, int64_t value);
+    static void VisitPrimitiveLiteralFloat(void* state, uintptr_t sibling_list_id, float value);
+    static void VisitPrimitiveLiteralDouble(void* state, uintptr_t sibling_list_id, double value);
+
     static void VisitTimestampLiteral(void* state, uintptr_t sibling_list_id, int64_t value);
     static void VisitTimestampNtzLiteral(void* state, uintptr_t sibling_list_id, int64_t value);
     static void VisitDateLiteral(void* state, uintptr_t sibling_list_id, int32_t value);
@@ -45,40 +61,57 @@ private:
     static void VisitDecimalLiteral(void *state, uintptr_t sibling_list_id, uint64_t value_ms, uint64_t value_ls, uint8_t precision, uint8_t scale);
     static void VisitColumnExpression(void *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name);
     static void VisitStructExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
+    static void VisitNotExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
+    static void VisitIsNullExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
 
     template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME>
     static ffi::VisitVariadicFn VisitUnaryExpression() {
-        return (ffi::VisitVariadicFn) &VisitVariadicExpression<EXPRESSION_TYPE, EXPRESSION_TYPENAME, 1>;
+        return &VisitVariadicExpression<EXPRESSION_TYPE, EXPRESSION_TYPENAME>;
     }
     template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME>
     static ffi::VisitVariadicFn VisitBinaryExpression() {
-        return (ffi::VisitVariadicFn) &VisitVariadicExpression<EXPRESSION_TYPE, EXPRESSION_TYPENAME, 2>;
+        return &VisitBinaryExpression<EXPRESSION_TYPE, EXPRESSION_TYPENAME>;
     }
-    template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME, int32_t EXPECTED_CHILDREN = -1>
+    template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME>
     static ffi::VisitVariadicFn VisitVariadicExpression() {
-        return (ffi::VisitVariadicFn) &VisitVariadicExpression<EXPRESSION_TYPE, EXPRESSION_TYPENAME>;
+        return &VisitVariadicExpression<EXPRESSION_TYPE, EXPRESSION_TYPENAME>;
     }
-    template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME, int32_t EXPECTED_CHILDREN = -1>
+
+    template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME>
     static void VisitVariadicExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+        printf("Called into %s\n", EnumUtil::ToString(EXPRESSION_TYPE).c_str());
         auto state_cast = static_cast<ExpressionVisitor*>(state);
-
         auto children = state_cast->TakeFieldList(child_list_id);
-
-        if (EXPECTED_CHILDREN != -1) {
-            D_ASSERT(children->size() == EXPECTED_CHILDREN);
+        if (!children) {
+            state_cast->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
+            return;
         }
-
-        if (EXPECTED_CHILDREN == 2) {
-            auto &lhs = children->at(0);
-            auto &rhs = children->at(1);
-            unique_ptr<ParsedExpression> expression = make_uniq<EXPRESSION_TYPENAME>(EXPRESSION_TYPE, std::move(lhs), std::move(rhs));
-            state_cast->AppendToList(sibling_list_id, std::move(expression));
-        } else {
-            unique_ptr<ParsedExpression> expression = make_uniq<EXPRESSION_TYPENAME>(EXPRESSION_TYPE, std::move(*children));
-            state_cast->AppendToList(sibling_list_id, std::move(expression));
-        }
-
+        unique_ptr<ParsedExpression> expression = make_uniq<EXPRESSION_TYPENAME>(EXPRESSION_TYPE, std::move(*children));
+        state_cast->AppendToList(sibling_list_id, std::move(expression));
     }
+    template <ExpressionType EXPRESSION_TYPE, typename EXPRESSION_TYPENAME>
+    static void VisitBinaryExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+        printf("Called into %s\n", EnumUtil::ToString(EXPRESSION_TYPE).c_str());
+        auto state_cast = static_cast<ExpressionVisitor*>(state);
+        auto children = state_cast->TakeFieldList(child_list_id);
+        if (!children) {
+            state_cast->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
+            return;
+        }
+
+        if (children->size() != 2) {
+            state_cast->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
+            state_cast->error = ErrorData("INCORRECT SIZE IN VISIT_BINARY_EXPRESSION" + EnumUtil::ToString(EXPRESSION_TYPE));
+            return;
+        }
+
+        auto &lhs = children->at(0);
+        auto &rhs = children->at(1);
+        unique_ptr<ParsedExpression> expression = make_uniq<EXPRESSION_TYPENAME>(EXPRESSION_TYPE, std::move(lhs), std::move(rhs));
+        state_cast->AppendToList(sibling_list_id, std::move(expression));
+    }
+
+    static void VisitComparisonExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
 
     // List functions
     static uintptr_t MakeFieldList(ExpressionVisitor* state, uintptr_t capacity_hint);

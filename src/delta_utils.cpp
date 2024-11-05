@@ -1,12 +1,31 @@
 #include "delta_utils.hpp"
 
+#include <duckdb/common/exception/conversion_exception.hpp>
+
 #include "duckdb.hpp"
 #include "duckdb/main/extension_util.hpp"
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 #include <duckdb/planner/filter/null_filter.hpp>
 #include "duckdb/parser/expression/conjunction_expression.hpp"
+#include "duckdb/parser/expression/comparison_expression.hpp"
+#include "duckdb/common/types/decimal.hpp"
+
 
 namespace duckdb {
+
+void ExpressionVisitor::VisitComparisonExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+    auto state_cast = static_cast<ExpressionVisitor*>(state);
+
+    auto children = state_cast->TakeFieldList(child_list_id);
+    if (!children) {
+        return;
+    }
+
+    auto &lhs = children->at(0);
+    auto &rhs = children->at(1);
+    unique_ptr<ComparisonExpression> expression = make_uniq<ComparisonExpression>(ExpressionType::COMPARE_LESSTHAN, std::move(lhs), std::move(rhs));
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
+}
 
 unique_ptr<vector<unique_ptr<ParsedExpression>>> ExpressionVisitor::VisitKernelExpression(const ffi::Handle<ffi::SharedExpression> *expression) {
     ExpressionVisitor state;
@@ -17,12 +36,14 @@ unique_ptr<vector<unique_ptr<ParsedExpression>>> ExpressionVisitor::VisitKernelE
 
     // Templated primitive functions
     visitor.visit_literal_bool = VisitPrimitiveLiteral<bool, Value::BOOLEAN>();
-    visitor.visit_literal_byte = VisitPrimitiveLiteral<int8_t, Value::TINYINT>();
-    visitor.visit_literal_short = VisitPrimitiveLiteral<int16_t, Value::SMALLINT>();
-    visitor.visit_literal_int = VisitPrimitiveLiteral<int32_t, Value::INTEGER>();
-    visitor.visit_literal_long = VisitPrimitiveLiteral<int64_t, Value::BIGINT>();
-    visitor.visit_literal_float = VisitPrimitiveLiteral<float, Value::FLOAT>();
-    visitor.visit_literal_double = VisitPrimitiveLiteral<double, Value::DOUBLE>();
+    visitor.visit_literal_byte = VisitPrimitiveLiteralByte;
+    visitor.visit_literal_short = VisitPrimitiveLiteralShort;
+    visitor.visit_literal_int = VisitPrimitiveLiteralInt;
+    visitor.visit_literal_long = VisitPrimitiveLiteralLong;
+    visitor.visit_literal_float = VisitPrimitiveLiteralFloat;
+    visitor.visit_literal_double = VisitPrimitiveLiteralDouble;
+
+    visitor.visit_literal_decimal = VisitDecimalLiteral;
 
     // Custom Implementations
     visitor.visit_literal_timestamp = &VisitTimestampLiteral;
@@ -35,87 +56,164 @@ unique_ptr<vector<unique_ptr<ParsedExpression>>> ExpressionVisitor::VisitKernelE
     visitor.visit_literal_null = &VisitNullLiteral;
     visitor.visit_literal_array = &VisitArrayLiteral;
 
-    visitor.visit_and = VisitBinaryExpression<ExpressionType::CONJUNCTION_AND, ConjunctionExpression>();
-    visitor.visit_or = VisitBinaryExpression<ExpressionType::CONJUNCTION_OR, ConjunctionExpression>();
+    visitor.visit_and = VisitVariadicExpression<ExpressionType::CONJUNCTION_AND, ConjunctionExpression>();
+    visitor.visit_or = VisitVariadicExpression<ExpressionType::CONJUNCTION_OR, ConjunctionExpression>();
 
-    // visitor.visit_lt = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
-    // visitor.visit_le = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHANOREQUALTO, ComparisonExpression>();
-    // visitor.visit_gt = VisitBinaryExpression<ExpressionType::COMPARE_GREATERTHAN, ComparisonExpression>();
-    // visitor.visit_ge = VisitBinaryExpression<ExpressionType::COMPARE_GREATERTHANOREQUALTO, ComparisonExpression>();
-    //
-    // visitor.visit_ne = VisitBinaryExpression<ExpressionType::COMPARE_NOTEQUAL, ComparisonExpression>();
-    // visitor.visit_distinct = VisitBinaryExpression<ExpressionType::COMPARE_DISTINCT_FROM, ComparisonExpression>();
-    //
-    // visitor.visit_in = VisitBinaryExpression<ExpressionType::COMPARE_IN, ComparisonExpression>();
-    // visitor.visit_not_in = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
+    visitor.visit_lt = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
+    visitor.visit_le = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHANOREQUALTO, ComparisonExpression>();
+    visitor.visit_gt = VisitBinaryExpression<ExpressionType::COMPARE_GREATERTHAN, ComparisonExpression>();
+    visitor.visit_ge = VisitBinaryExpression<ExpressionType::COMPARE_GREATERTHANOREQUALTO, ComparisonExpression>();
+
+    visitor.visit_eq = VisitBinaryExpression<ExpressionType::COMPARE_EQUAL, ComparisonExpression>();
+    visitor.visit_ne = VisitBinaryExpression<ExpressionType::COMPARE_NOTEQUAL, ComparisonExpression>();
+    visitor.visit_distinct = VisitBinaryExpression<ExpressionType::COMPARE_DISTINCT_FROM, ComparisonExpression>();
+
+    visitor.visit_in = VisitBinaryExpression<ExpressionType::COMPARE_IN, ComparisonExpression>();
+    visitor.visit_not_in = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
     //
     // // TODO fix these
-    // visitor.visit_add = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
-    // visitor.visit_minus = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
-    // visitor.visit_multiply = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
-    // visitor.visit_divide = VisitBinaryExpression<ExpressionType::COMPARE_NOT_IN, ComparisonExpression>();
+    visitor.visit_add = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
+    visitor.visit_minus = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
+    visitor.visit_multiply = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
+    visitor.visit_divide = VisitBinaryExpression<ExpressionType::COMPARE_LESSTHAN, ComparisonExpression>();
 
     visitor.visit_column = &VisitColumnExpression;
     visitor.visit_struct_expr = &VisitStructExpression;
 
     visitor.visit_literal_struct = &VisitStructLiteral;
 
-    uintptr_t result = visit_expression(expression, &visitor);
+    visitor.visit_not = &VisitNotExpression;
+    visitor.visit_is_null = &VisitIsNullExpression;
+
+    uintptr_t result = ffi::visit_expression(expression, &visitor);
+
+    if (state.error.HasError()) {
+        state.error.Throw();
+    }
+
     return state.TakeFieldList(result);
 }
 
+void ExpressionVisitor::VisitPrimitiveLiteralBool(void* state, uintptr_t sibling_list_id, bool value) {
+    printf("VisitPrimititveLiteral bool\n");
+    auto expression = make_uniq<ConstantExpression>(Value::BOOLEAN(value));
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
+}
+void ExpressionVisitor::VisitPrimitiveLiteralByte(void* state, uintptr_t sibling_list_id, int8_t value) {
+    printf("VisitPrimititveLiteral tinyint\n");
+    auto expression = make_uniq<ConstantExpression>(Value::TINYINT(value));
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
+}
+void ExpressionVisitor::VisitPrimitiveLiteralShort(void* state, uintptr_t sibling_list_id, int16_t value) {
+    printf("VisitPrimititveLiteral smallint\n");
+    auto expression = make_uniq<ConstantExpression>(Value::SMALLINT(value));
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
+}
+void ExpressionVisitor::VisitPrimitiveLiteralInt(void* state, uintptr_t sibling_list_id, int32_t value) {
+    printf("VisitPrimititveLiteral int\n");
+    auto expression = make_uniq<ConstantExpression>(Value::INTEGER(value));
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
+}
+void ExpressionVisitor::VisitPrimitiveLiteralLong(void* state, uintptr_t sibling_list_id, int64_t value) {
+    printf("VisitPrimititveLiteral bigint\n");
+    auto expression = make_uniq<ConstantExpression>(Value::BIGINT(value));
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
+}
+void ExpressionVisitor::VisitPrimitiveLiteralFloat(void* state, uintptr_t sibling_list_id, float value) {
+    printf("VisitPrimititveLiteral float\n");
+    auto expression = make_uniq<ConstantExpression>(Value::FLOAT(value));
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
+}
+void ExpressionVisitor::VisitPrimitiveLiteralDouble(void* state, uintptr_t sibling_list_id, double value) {
+    printf("VisitPrimititveLiteral double\n");
+    auto expression = make_uniq<ConstantExpression>(Value::DOUBLE(value));
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
+}
+
 void ExpressionVisitor::VisitTimestampLiteral(void* state, uintptr_t sibling_list_id, int64_t value) {
+    printf("VisitTimestampLiteral\n");
     auto expression = make_uniq<ConstantExpression>(Value::TIMESTAMPTZ(static_cast<timestamp_t>(value)));
     static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
 }
 
 void ExpressionVisitor::VisitTimestampNtzLiteral(void* state, uintptr_t sibling_list_id, int64_t value) {
+    printf("VisitTimestampNtzLiteral\n");
     auto expression = make_uniq<ConstantExpression>(Value::TIMESTAMP(static_cast<timestamp_t>(value)));
     static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
 }
 
 void ExpressionVisitor::VisitDateLiteral(void* state, uintptr_t sibling_list_id, int32_t value) {
+    printf("VisitDateLiteral\n");
     auto expression = make_uniq<ConstantExpression>(Value::DATE(static_cast<date_t>(value)));
     static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
 }
 
 void ExpressionVisitor::VisitStringLiteral(void* state, uintptr_t sibling_list_id, ffi::KernelStringSlice value) {
+    printf("VisitStringLiteral\n");
     auto expression = make_uniq<ConstantExpression>(Value(string(value.ptr, value.len)));
     static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
 }
 void ExpressionVisitor::VisitBinaryLiteral(void* state, uintptr_t sibling_list_id, const uint8_t *buffer, uintptr_t len) {
+    printf("VisitBinaryLiteral\n");
     auto expression = make_uniq<ConstantExpression>(Value::BLOB(buffer, len));
     static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
 }
 void ExpressionVisitor::VisitNullLiteral(void* state, uintptr_t sibling_list_id) {
+    printf("VisitNullLiteral\n");
     auto expression = make_uniq<ConstantExpression>(Value());
     static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
 }
 void ExpressionVisitor::VisitArrayLiteral(void* state, uintptr_t sibling_list_id, uintptr_t child_id) {
-    throw NotImplementedException("ExpressionVisitor::VisitArrayLiteral");
+    printf("VisitArrayLiteral\n");
+    // throw NotImplementedException("ExpressionVisitor::VisitArrayLiteral");
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
 }
-void ExpressionVisitor::VisitStructLiteral(void *data, uintptr_t sibling_list_id, uintptr_t child_field_list_value, uintptr_t child_value_list_id) {
-    throw NotImplementedException("ExpressionVisitor::VisitStructLiteral");
+void ExpressionVisitor::VisitStructLiteral(void *state, uintptr_t sibling_list_id, uintptr_t child_field_list_value, uintptr_t child_value_list_id) {
+    // throw NotImplementedException("ExpressionVisitor::VisitStructLiteral");
+    printf("VisitStructLiteral\n");
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
 }
 
-// TODO: double check implementation
+void ExpressionVisitor::VisitNotExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+    // throw NotImplementedException("ExpressionVisitor::VisitStructLiteral");
+    printf("VisitNotExpression\n");
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
+}
+
+void ExpressionVisitor::VisitIsNullExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+    // throw NotImplementedException("ExpressionVisitor::VisitStructLiteral");
+    printf("VisitIsNullExpression\n");
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
+}
+
+// FIXME: How does this work? Why are both value_ms and value_ls 1?
+// FIXME: why is the scale larger than width? That isn't allowed
 void ExpressionVisitor::VisitDecimalLiteral(void *state, uintptr_t sibling_list_id, uint64_t value_ms, uint64_t value_ls, uint8_t precision, uint8_t scale) {
-    auto expression = make_uniq<ConstantExpression>(Value::DECIMAL({(int64_t)value_ms, value_ls}, precision, scale));
-    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
-
-    throw NotImplementedException("ExpressionVisitor::VisitStructLiteral");
+    try {
+        if (precision >= Decimal::MAX_WIDTH_INT64 || value_ls > (uint64_t)NumericLimits<int64_t>::Maximum()) {
+            throw NotImplementedException("ExpressionVisitor::VisitDecimalLiteral HugeInt decimals");
+        }
+        auto expression = make_uniq<ConstantExpression>(Value::DECIMAL(42, 18, 10));
+        static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
+    } catch (Exception &e) {
+        static_cast<ExpressionVisitor*>(state)->error = ErrorData(e);
+    }
+    // static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
 }
 
 // TODO: same as string
 void ExpressionVisitor::VisitColumnExpression(void *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name) {
+    printf("Called into VisitColumnExpression\n");
     auto expression = make_uniq<ColumnRefExpression>(string(name.ptr, name.len));
     static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(expression));
 }
 void ExpressionVisitor::VisitStructExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
-    throw NotImplementedException("ExpressionVisitor::VisitStructExpression");
+    printf("Called into VisitStructExpression\n");
+    static_cast<ExpressionVisitor*>(state)->AppendToList(sibling_list_id, std::move(make_uniq<ConstantExpression>(Value(42))));
 }
 
 uintptr_t ExpressionVisitor::MakeFieldList(ExpressionVisitor* state, uintptr_t capacity_hint) {
+    printf("MakeFieldList\n");
     return state->MakeFieldListImpl(capacity_hint);
 }
 uintptr_t ExpressionVisitor::MakeFieldListImpl(uintptr_t capacity_hint) {
@@ -131,7 +229,8 @@ uintptr_t ExpressionVisitor::MakeFieldListImpl(uintptr_t capacity_hint) {
 void ExpressionVisitor::AppendToList(uintptr_t id, unique_ptr<ParsedExpression> child) {
     auto it = inflight_lists.find(id);
     if (it == inflight_lists.end()) {
-        throw InternalException("ExpressionVisitor::AppendToList");
+        error = ErrorData("ExpressionVisitor::AppendToList could not find " + Value::UBIGINT(id).ToString());
+        return;
     }
 
     it->second->emplace_back(std::move(child));
@@ -140,7 +239,8 @@ void ExpressionVisitor::AppendToList(uintptr_t id, unique_ptr<ParsedExpression> 
 unique_ptr<ExpressionVisitor::FieldList> ExpressionVisitor::TakeFieldList(uintptr_t id) {
     auto it = inflight_lists.find(id);
     if (it == inflight_lists.end()) {
-        throw InternalException("SchemaVisitor::TakeFieldList");
+        error = ErrorData("ExpressionVisitor::TakeFieldList could not find " + Value::UBIGINT(id).ToString());
+        return nullptr;
     }
     auto rval = std::move(it->second);
     inflight_lists.erase(it);
