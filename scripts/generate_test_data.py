@@ -65,13 +65,13 @@ def generate_test_data_delta_rs_multi(path, init, tables, splits = 1):
             os.makedirs(f"{generated_path}/{table['name']}/delta_lake", exist_ok=True)
             write_deltalake(f"{generated_path}/{table['name']}/delta_lake", test_table_df, mode="append")
 
-def generate_test_data_delta_rs(path, query, part_column=False, add_golden_table=True):
+def generate_test_data_delta_rs(path, query, part_columns=False, add_golden_table=True):
     """
     generate_test_data_delta_rs generates some test data using delta-rs and duckdb
 
     :param path: the test data path (prefixed with BASE_PATH)
     :param query: a duckdb query that produces a table called 'test_table'
-    :param part_column: Optionally the name of the column to partition by
+    :param part_columns: Optionally the name of the columns to partition by
     :return: describe what it returns
     """
     generated_path = f"{BASE_PATH}/{path}"
@@ -85,16 +85,16 @@ def generate_test_data_delta_rs(path, query, part_column=False, add_golden_table
 
     # Write delta table data
     test_table_df = con.sql("FROM test_table;").df()
-    if (part_column):
-        write_deltalake(f"{generated_path}/delta_lake", test_table_df,  partition_by=[part_column])
+    if (part_columns):
+        write_deltalake(f"{generated_path}/delta_lake", test_table_df,  partition_by=part_columns)
     else:
         write_deltalake(f"{generated_path}/delta_lake", test_table_df)
 
     if add_golden_table:
         # Write DuckDB's reference data
         os.mkdir(f'{generated_path}/duckdb')
-        if (part_column):
-            con.sql(f"COPY test_table to '{generated_path}/duckdb' (FORMAT parquet, PARTITION_BY {part_column})")
+        if (part_columns):
+            con.sql(f"COPY test_table to '{generated_path}/duckdb' (FORMAT parquet, PARTITION_BY ({','.join(part_columns)}))")
         else:
             con.sql(f"COPY test_table to '{generated_path}/duckdb/data.parquet' (FORMAT parquet)")
 
@@ -158,7 +158,7 @@ generate_test_data_delta_rs_multi("delta_rs_tpch_sf0_01", init, tables)
 
 ### Simple partitioned table
 query = "CREATE table test_table AS SELECT i, i%2 as part from range(0,10) tbl(i);"
-generate_test_data_delta_rs("simple_partitioned", query, "part")
+generate_test_data_delta_rs("simple_partitioned", query, ["part"])
 
 ### Lineitem SF0.01 No partitions
 query = "call dbgen(sf=0.01);"
@@ -168,20 +168,25 @@ generate_test_data_delta_rs("lineitem_sf0_01", query)
 ### Lineitem SF0.01 10 Partitions
 query = "call dbgen(sf=0.01);"
 query += "CREATE table test_table AS SELECT *, l_orderkey%10 as part from lineitem;"
-generate_test_data_delta_rs("lineitem_sf0_01_10part", query, "part")
+generate_test_data_delta_rs("lineitem_sf0_01_10part", query, ["part"])
+
+### Lineitem SF0.01 partitioned by l_returnflag
+query = "call dbgen(sf=10);"
+query += "CREATE table test_table AS from lineitem;"
+generate_test_data_delta_rs("lineitem_sf10_part_by_returnflag_linestatus", query, ['l_returnflag', 'l_linestatus'])
 
 ## Simple table with a blob as a value
 query = "create table test_table as SELECT encode('ABCDE') as blob, encode('ABCDE') as blob_part, 'ABCDE' as string UNION ALL SELECT encode('😈') as blob, encode('😈') as blob_part, '😈' as string"
-generate_test_data_delta_rs("simple_blob_table", query, "blob_part", add_golden_table=False)
+generate_test_data_delta_rs("simple_blob_table", query, ["blob_part"], add_golden_table=False)
 
 ## Simple partitioned table with structs
 query = "CREATE table test_table AS SELECT {'i':i, 'j':i+1} as value, i%2 as part from range(0,10) tbl(i);"
-generate_test_data_delta_rs("simple_partitioned_with_structs", query, "part")
+generate_test_data_delta_rs("simple_partitioned_with_structs", query, ["part"])
 
 ## Partitioned table with all types we can file skip on
 for type in ["bool", "int", "tinyint", "smallint", "bigint", "float", "double", "varchar"]:
     query = f"CREATE table test_table as select i::{type} as value, i::{type} as part from range(0,2) tbl(i)"
-    generate_test_data_delta_rs(f"test_file_skipping/{type}", query, "part")
+    generate_test_data_delta_rs(f"test_file_skipping/{type}", query, ["part"])
 
 ## Simple table with deletion vector
 con = duckdb.connect()

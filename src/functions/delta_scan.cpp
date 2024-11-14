@@ -631,6 +631,19 @@ void DeltaMultiFileReader::BindOptions(MultiFileReaderOptions &options, MultiFil
 
 	MultiFileReader::BindOptions(options, files, return_types, names, bind_data);
 
+    auto &delta_snapshot = dynamic_cast<DeltaSnapshot &>(files);
+    auto f = delta_snapshot.GetFirstFile();
+    if (!delta_snapshot.metadata.empty()) {
+        for (auto &part : delta_snapshot.metadata.front()->partition_map) {
+            idx_t partition_index;
+            auto lookup = std::find(names.begin(), names.end(), part.first);
+            if (lookup != names.end()) {
+                partition_index = NumericCast<idx_t>(lookup - names.begin());
+            }
+            bind_data.hive_partitioning_indexes.emplace_back(part.first, partition_index);
+        }
+    }
+
 	auto demo_gen_col_opt = options.custom_options.find("delta_file_number");
 	if (demo_gen_col_opt != options.custom_options.end()) {
 		if (demo_gen_col_opt->second.GetValue<bool>()) {
@@ -646,8 +659,26 @@ void DeltaMultiFileReader::FinalizeBind(const MultiFileReaderOptions &file_optio
                                         const vector<string> &global_names, const vector<column_t> &global_column_ids,
                                         MultiFileReaderData &reader_data, ClientContext &context,
                                         optional_ptr<MultiFileReaderGlobalState> global_state) {
-	MultiFileReader::FinalizeBind(file_options, options, filename, local_names, global_types, global_names,
-	                              global_column_ids, reader_data, context, global_state);
+    // create a map of name -> column index
+    case_insensitive_map_t<idx_t> name_map;
+    if (file_options.union_by_name) {
+        for (idx_t col_idx = 0; col_idx < local_names.size(); col_idx++) {
+            name_map[local_names[col_idx]] = col_idx;
+        }
+    }
+    for (idx_t i = 0; i < global_column_ids.size(); i++) {
+        auto column_id = global_column_ids[i];
+        if (IsRowIdColumnId(column_id)) {
+            // row-id
+            reader_data.constant_map.emplace_back(i, Value::BIGINT(42));
+            continue;
+        }
+        if (column_id == options.filename_idx) {
+            // filename
+            reader_data.constant_map.emplace_back(i, Value(filename));
+            continue;
+        }
+    }
 
 	// Handle custom delta option set in MultiFileReaderOptions::custom_options
 	auto file_number_opt = file_options.custom_options.find("delta_file_number");
