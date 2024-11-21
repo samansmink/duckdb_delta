@@ -350,6 +350,14 @@ jobs:
         run: |
           GENERATED_DATA_AVAILABLE=1 make test_debug
 
+      - name: Print Rust logs
+        run: |
+          for filename in build/debug/rust/src/*/*build-*.log; do 
+            echo Printing logs for file $filename
+            cat $filename;
+            echo Done printing logs for $filename
+          done
+
   sanitizer-thread:
     name: Running Sanitizer tests (Thread)
     runs-on: ubuntu-latest
@@ -399,3 +407,11 @@ jobs:
         shell: bash
         run: |
           GENERATED_DATA_AVAILABLE=1 make test_debug
+
+      - name: Print Rust logs
+        run: |
+          for filename in build/debug/rust/src/*/*build-*.log; do 
+            echo Printing logs for file $filename
+            cat $filename;
+            echo Done printing logs for $filename
+          done
