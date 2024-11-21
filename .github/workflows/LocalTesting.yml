@@ -60,6 +60,7 @@ jobs:
           GENERATED_DATA_AVAILABLE=1 make test_debug
 
       - name: Print Rust logs
+        if: always()
         run: |
           for filename in build/debug/rust/src/*/*build-*.log; do 
             echo Printing logs for file $filename
@@ -118,6 +119,7 @@ jobs:
           GENERATED_DATA_AVAILABLE=1 make test_debug
 
       - name: Print Rust logs
+        if: always()
         run: |
           for filename in build/debug/rust/src/*/*build-*.log; do 
             echo Printing logs for file $filename
