@@ -17,6 +17,7 @@ jobs:
     env:
       GEN: ninja
       VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+      MINIMAL_TEST_DEPENDENCIES: 1
 
     steps:
       - uses: actions/checkout@v3
@@ -74,6 +75,7 @@ jobs:
     env:
       GEN: ninja
       VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+      MINIMAL_TEST_DEPENDENCIES: 1
 
     steps:
       - uses: actions/checkout@v3
