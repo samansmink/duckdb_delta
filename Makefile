@@ -16,7 +16,7 @@ test_debug: export DELTA_KERNEL_TESTS_PATH=./build/debug/rust/src/delta_kernel/k
 test_debug: export DAT_PATH=./build/debug/rust/src/delta_kernel/acceptance/tests/dat
 
 ifeq ($(MINIMAL_TEST_DEPENDENCIES), 1)
-	CORE_EXTENSIONS:=''
+	CORE_EXTENSIONS:='tpch'
 else
     CORE_EXTENSIONS:='tpcds;tpch;aws;azure;httpfs'
 endif
