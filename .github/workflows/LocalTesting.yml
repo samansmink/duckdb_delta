@@ -43,6 +43,11 @@ jobs:
         with:
           vcpkgGitCommitId: a1a1cbc975abf909a6c8985a6a2b8fe20bbd9bd6
 
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 4
+
       - name: Configure OpenSSL for Rust
         run: |
           echo "OPENSSL_ROOT_DIR=`pwd`/build/debug/vcpkg_installed/x64-linux" >> $GITHUB_ENV
@@ -106,6 +111,11 @@ jobs:
           echo "OPENSSL_ROOT_DIR=`pwd`/build/debug/vcpkg_installed/x64-linux" >> $GITHUB_ENV
           echo "OPENSSL_DIR=`pwd`/build/debug/vcpkg_installed/x64-linux" >> $GITHUB_ENV
           echo "OPENSSL_USE_STATIC_LIBS=true" >> $GITHUB_ENV
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 4
 
       - name: Build
         shell: bash
