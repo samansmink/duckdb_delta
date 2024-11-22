@@ -6,7 +6,7 @@ require parquet
 
 require delta
 
-require-env GENERATED_DATA_AVAILABLE
+require-env GENERATED_DATA_LARGE_AVAILABLE
 
 query I rowsort q1
 SELECT sum(id) FROM delta_scan('./data/generated/simple_sf1_with_dv/delta_lake/')

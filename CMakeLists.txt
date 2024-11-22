@@ -133,6 +133,10 @@ set(DELTA_KERNEL_FFI_HEADER_CXX
     "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers/delta_kernel_ffi.hpp"
 )
 
+set(DELTA_KERNEL_BUILD_COMMAND_DEBUG ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build --package delta_kernel_ffi --workspace --all-features ${RUST_PLATFORM_PARAM})
+set(DELTA_KERNEL_BUILD_COMMAND_RELEASE ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build --package delta_kernel_ffi --workspace --all-features --release ${RUST_PLATFORM_PARAM})
+set(DELTA_KERNEL_BUILD_COMMAND_DAT ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build --manifest-path=${CMAKE_BINARY_DIR}/rust/src/delta_kernel/acceptance/Cargo.toml)
+
 # Add rust_example as a CMake target
 ExternalProject_Add(
   ${KERNEL_NAME}
@@ -149,21 +153,11 @@ ExternalProject_Add(
   UPDATE_COMMAND ""
   BUILD_IN_SOURCE 1
   # Build debug build
-  BUILD_COMMAND
-    ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build
-    --package delta_kernel_ffi --workspace --all-features ${RUST_PLATFORM_PARAM}
-  # Build release build
-  COMMAND
-    ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build
-    --package delta_kernel_ffi --workspace --all-features --release
-    ${RUST_PLATFORM_PARAM}
+  BUILD_COMMAND $<$<CONFIG:Debug>:${DELTA_KERNEL_BUILD_COMMAND_DEBUG}>$<$<CONFIG:Release>:${DELTA_KERNEL_BUILD_COMMAND_RELEASE}>
   # Build DATs
-  COMMAND
-    ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build
-    --manifest-path=${CMAKE_BINARY_DIR}/rust/src/delta_kernel/acceptance/Cargo.toml
+  COMMAND ${DELTA_KERNEL_BUILD_COMMAND_DAT}
   # Define the byproducts, required for building with Ninja
-  BUILD_BYPRODUCTS "${DELTA_KERNEL_LIBPATH_DEBUG}"
-  BUILD_BYPRODUCTS "${DELTA_KERNEL_LIBPATH_RELEASE}"
+  BUILD_BYPRODUCTS "$<$<CONFIG:Debug>:${DELTA_KERNEL_LIBPATH_DEBUG}>$<$<CONFIG:Release>:${DELTA_KERNEL_LIBPATH_RELEASE}>"
   BUILD_BYPRODUCTS "${DELTA_KERNEL_FFI_HEADER_C}"
   BUILD_BYPRODUCTS "${DELTA_KERNEL_FFI_HEADER_CXX}"
   INSTALL_COMMAND ""

@@ -8,9 +8,17 @@ import os
 import shutil
 import math
 import glob
+import argparse
+
+# Define command-line arguments
+parser = argparse.ArgumentParser(description="Generate test data for duckdb_delta tests")
+parser.add_argument("--large", action="store_true", help="Generate the larger test data as well")
+args = parser.parse_args()
 
 BASE_PATH = os.path.dirname(os.path.realpath(__file__)) + "/../data/generated"
 TMP_PATH = '/tmp'
+
+GENERATE_LARGE_TEST_DATA=args.large
 
 def delete_old_files():
     if (os.path.isdir(BASE_PATH)):
@@ -193,10 +201,11 @@ con = duckdb.connect()
 con.query(f"call dbgen(sf=0.01); COPY (from lineitem) TO '{TMP_PATH}/modified_lineitem_sf0_01.parquet'")
 generate_test_data_pyspark('lineitem_sf0_01_with_dv', 'lineitem_sf0_01_with_dv', f'{TMP_PATH}/modified_lineitem_sf0_01.parquet', "l_shipdate = '1994-01-01'")
 
-## Lineitem SF1 with deletion vector
-con = duckdb.connect()
-con.query(f"call dbgen(sf=1); COPY (from lineitem) TO '{TMP_PATH}/modified_lineitem_sf1.parquet'")
-generate_test_data_pyspark('lineitem_sf1_with_dv', 'lineitem_sf1_with_dv', f'{TMP_PATH}/modified_lineitem_sf1.parquet', "l_shipdate = '1994-01-01'")
+if GENERATE_LARGE_TEST_DATA:
+    ## Lineitem SF1 with deletion vector
+    con = duckdb.connect()
+    con.query(f"call dbgen(sf=1); COPY (from lineitem) TO '{TMP_PATH}/modified_lineitem_sf1.parquet'")
+    generate_test_data_pyspark('lineitem_sf1_with_dv', 'lineitem_sf1_with_dv', f'{TMP_PATH}/modified_lineitem_sf1.parquet', "l_shipdate = '1994-01-01'")
 
 ## TPCH SF0.01 full dataset
 con = duckdb.connect()
@@ -210,22 +219,23 @@ con.query(f"call dsdgen(sf=0.01); EXPORT DATABASE '{TMP_PATH}/tpcds_sf0_01_expor
 for table in ["call_center","catalog_page","catalog_returns","catalog_sales","customer","customer_demographics","customer_address","date_dim","household_demographics","inventory","income_band","item","promotion","reason","ship_mode","store","store_returns","store_sales","time_dim","warehouse","web_page","web_returns","web_sales","web_site"]:
     generate_test_data_pyspark(f"tpcds_sf0_01_{table}", f'tpcds_sf0_01/{table}', f'{TMP_PATH}/tpcds_sf0_01_export/{table}.parquet')
 
-## TPCH SF1 full dataset
-if (not os.path.isdir(BASE_PATH + '/tpch_sf1')):
-    con = duckdb.connect()
-    con.query(f"call dbgen(sf=1); EXPORT DATABASE '{TMP_PATH}/tpch_sf1_export' (FORMAT parquet)")
-    for table in ["customer","lineitem","nation","orders","part","partsupp","region","supplier"]:
-        generate_test_data_pyspark(f"tpch_sf1_{table}", f'tpch_sf1/{table}', f'{TMP_PATH}/tpch_sf1_export/{table}.parquet')
-    con.query(f"attach '{BASE_PATH + '/tpch_sf1/duckdb.db'}' as duckdb_out")
-    for table in ["customer","lineitem","nation","orders","part","partsupp","region","supplier"]:
-        con.query(f"create table duckdb_out.{table} as from {table}")
+if GENERATE_LARGE_TEST_DATA:
+    ## TPCH SF1 full dataset
+    if (not os.path.isdir(BASE_PATH + '/tpch_sf1')):
+        con = duckdb.connect()
+        con.query(f"call dbgen(sf=1); EXPORT DATABASE '{TMP_PATH}/tpch_sf1_export' (FORMAT parquet)")
+        for table in ["customer","lineitem","nation","orders","part","partsupp","region","supplier"]:
+            generate_test_data_pyspark(f"tpch_sf1_{table}", f'tpch_sf1/{table}', f'{TMP_PATH}/tpch_sf1_export/{table}.parquet')
+        con.query(f"attach '{BASE_PATH + '/tpch_sf1/duckdb.db'}' as duckdb_out")
+        for table in ["customer","lineitem","nation","orders","part","partsupp","region","supplier"]:
+            con.query(f"create table duckdb_out.{table} as from {table}")
 
-## TPCDS SF1 full dataset
-if (not os.path.isdir(BASE_PATH + '/tpcds_sf1')):
-    con = duckdb.connect()
-    con.query(f"call dsdgen(sf=1); EXPORT DATABASE '{TMP_PATH}/tpcds_sf1_export' (FORMAT parquet)")
-    for table in ["call_center","catalog_page","catalog_returns","catalog_sales","customer","customer_demographics","customer_address","date_dim","household_demographics","inventory","income_band","item","promotion","reason","ship_mode","store","store_returns","store_sales","time_dim","warehouse","web_page","web_returns","web_sales","web_site"]:
-        generate_test_data_pyspark(f"tpcds_sf1_{table}", f'tpcds_sf1/{table}', f'{TMP_PATH}/tpcds_sf1_export/{table}.parquet')
-    con.query(f"attach '{BASE_PATH + '/tpcds_sf1/duckdb.db'}' as duckdb_out")
-    for table in ["call_center","catalog_page","catalog_returns","catalog_sales","customer","customer_demographics","customer_address","date_dim","household_demographics","inventory","income_band","item","promotion","reason","ship_mode","store","store_returns","store_sales","time_dim","warehouse","web_page","web_returns","web_sales","web_site"]:
-        con.query(f"create table duckdb_out.{table} as from {table}")
+    ## TPCDS SF1 full dataset
+    if (not os.path.isdir(BASE_PATH + '/tpcds_sf1')):
+        con = duckdb.connect()
+        con.query(f"call dsdgen(sf=1); EXPORT DATABASE '{TMP_PATH}/tpcds_sf1_export' (FORMAT parquet)")
+        for table in ["call_center","catalog_page","catalog_returns","catalog_sales","customer","customer_demographics","customer_address","date_dim","household_demographics","inventory","income_band","item","promotion","reason","ship_mode","store","store_returns","store_sales","time_dim","warehouse","web_page","web_returns","web_sales","web_site"]:
+            generate_test_data_pyspark(f"tpcds_sf1_{table}", f'tpcds_sf1/{table}', f'{TMP_PATH}/tpcds_sf1_export/{table}.parquet')
+        con.query(f"attach '{BASE_PATH + '/tpcds_sf1/duckdb.db'}' as duckdb_out")
+        for table in ["call_center","catalog_page","catalog_returns","catalog_sales","customer","customer_demographics","customer_address","date_dim","household_demographics","inventory","income_band","item","promotion","reason","ship_mode","store","store_returns","store_sales","time_dim","warehouse","web_page","web_returns","web_sales","web_site"]:
+            con.query(f"create table duckdb_out.{table} as from {table}")

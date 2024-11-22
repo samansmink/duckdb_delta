@@ -1,3 +1,5 @@
+.PHONY: data-gen-venv generate-data generate-data-large
+
 PROJ_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Configuration of extension
@@ -32,7 +34,13 @@ include extension-ci-tools/makefiles/duckdb_extension.Makefile
 # Include the Makefile from the benchmark directory
 include benchmark/benchmark.Makefile
 
+data-gen-venv:
+	python3 -m venv venv
+	./venv/bin/pip3 install delta-spark duckdb pandas deltalake pyspark
+
 # Generate some test data to test with
-generate-data:
-	python3 -m pip install delta-spark duckdb pandas deltalake pyspark
-	python3 scripts/generate_test_data.py
+generate-data: data-gen-venv
+	./venv/bin/python3 scripts/generate_test_data.py
+
+generate-data-large: data-gen-venv
+	./venv/bin/python3 scripts/generate_test_data.py --large
