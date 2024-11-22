@@ -113,6 +113,9 @@ jobs:
           SANITIZER_MODE: thread
         run: |
           make generate-data
+          df -h
+          du -h -d 1 .
+          rm -rf venv
           make debug
 
       - name: Test
