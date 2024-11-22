@@ -119,7 +119,7 @@ set(DELTA_KERNEL_LIBNAME
     "${CMAKE_STATIC_LIBRARY_PREFIX}delta_kernel_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
 )
 set(DELTA_KERNEL_LIBPATH_DEBUG
-    "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/debug/${DELTA_KERNEL_LIBNAME}"
+    "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/release/${DELTA_KERNEL_LIBNAME}"
 )
 set(DELTA_KERNEL_LIBPATH_RELEASE
     "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/${RUST_PLATFORM_TARGET}/release/${DELTA_KERNEL_LIBNAME}"
@@ -133,7 +133,8 @@ set(DELTA_KERNEL_FFI_HEADER_CXX
     "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers/delta_kernel_ffi.hpp"
 )
 
-set(DELTA_KERNEL_BUILD_COMMAND_DEBUG ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build --package delta_kernel_ffi --workspace --all-features ${RUST_PLATFORM_PARAM})
+# NOTE: we always build the release version of the kernel
+set(DELTA_KERNEL_BUILD_COMMAND_DEBUG ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build --package delta_kernel_ffi --workspace --all-features --release ${RUST_PLATFORM_PARAM})
 set(DELTA_KERNEL_BUILD_COMMAND_RELEASE ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build --package delta_kernel_ffi --workspace --all-features --release ${RUST_PLATFORM_PARAM})
 set(DELTA_KERNEL_BUILD_COMMAND_DAT ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build --manifest-path=${CMAKE_BINARY_DIR}/rust/src/delta_kernel/acceptance/Cargo.toml)
 
