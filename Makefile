@@ -10,6 +10,10 @@ ifeq ($(SANITIZER_MODE), thread)
 	EXT_DEBUG_FLAGS:=-DENABLE_THREAD_SANITIZER=1
 endif
 
+ifneq ("${CUSTOM_LINKER}", "")
+	EXT_DEBUG_FLAGS:=${EXT_DEBUG_FLAGS} -DCUSTOM_LINKER=${CUSTOM_LINKER}
+endif
+
 # Set test paths
 test_release: export DELTA_KERNEL_TESTS_PATH=./build/release/rust/src/delta_kernel/kernel/tests/data
 test_release: export DAT_PATH=./build/release/rust/src/delta_kernel/acceptance/tests/dat

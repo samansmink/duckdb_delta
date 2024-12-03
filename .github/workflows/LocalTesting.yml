@@ -43,6 +43,8 @@ jobs:
         with:
           vcpkgGitCommitId: a1a1cbc975abf909a6c8985a6a2b8fe20bbd9bd6
 
+      - uses: rui314/setup-mold@v1
+
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
         with:
@@ -56,6 +58,8 @@ jobs:
 
       - name: Build
         shell: bash
+        env:
+          CUSTOM_LINKER: /usr/local/bin/mold
         run: |
           make generate-data
           make debug
@@ -92,6 +96,8 @@ jobs:
         shell: bash
         run: sudo apt-get update -y -qq && sudo apt-get install -y -qq ninja-build
 
+      - uses: rui314/setup-mold@v1
+
       - name: Setup Ccache
         uses: hendrikmuhs/ccache-action@main
         with:
@@ -121,6 +127,7 @@ jobs:
         shell: bash
         env:
           SANITIZER_MODE: thread
+          CUSTOM_LINKER: /usr/local/bin/mold
         run: |
           make generate-data
           df -h
