@@ -59,7 +59,7 @@ jobs:
       - name: Build
         shell: bash
         env:
-          CUSTOM_LINKER: /usr/local/bin/mold
+          CUSTOM_LINKER: mold
         run: |
           make generate-data
           make debug
@@ -127,7 +127,7 @@ jobs:
         shell: bash
         env:
           SANITIZER_MODE: thread
-          CUSTOM_LINKER: /usr/local/bin/mold
+          CUSTOM_LINKER: mold
         run: |
           make generate-data
           df -h
