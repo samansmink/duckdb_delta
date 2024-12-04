@@ -87,7 +87,7 @@ protected:
 	idx_t version;
 
 	//! Delta Kernel Structures
-	shared_ptr<SharedKernelSnapshot> snapshot;
+	KernelSnapshot snapshot;
 
 	KernelExternEngine extern_engine;
 	KernelScan scan;

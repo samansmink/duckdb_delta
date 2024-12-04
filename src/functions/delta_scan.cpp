@@ -430,8 +430,8 @@ void DeltaSnapshot::Bind(vector<LogicalType> &return_types, vector<string> &name
 	unique_ptr<SchemaVisitor::FieldList> schema;
 
 	{
-		auto snapshot_ref = snapshot->GetLockingRef();
-		schema = SchemaVisitor::VisitSnapshotSchema(snapshot_ref.GetPtr());
+		auto snapshot_ref = snapshot.get();
+		schema = SchemaVisitor::VisitSnapshotSchema(snapshot_ref);
 	}
 
 	for (const auto &field : *schema) {
@@ -494,26 +494,27 @@ void DeltaSnapshot::InitializeSnapshot() {
 	auto interface_builder = CreateBuilder(context, paths[0]);
 	extern_engine = TryUnpackKernelResult(ffi::builder_build(interface_builder));
 
-	if (!snapshot) {
-		snapshot = make_shared_ptr<SharedKernelSnapshot>(
-		    TryUnpackKernelResult(ffi::snapshot(path_slice, extern_engine.get())));
-	}
+	// if (!snapshot) {
+	// 	snapshot = make_shared_ptr<SharedKernelSnapshot>(
+	// 	    TryUnpackKernelResult(ffi::snapshot(path_slice, extern_engine.get())));
+	// }
+    snapshot = KernelSnapshot(TryUnpackKernelResult(ffi::snapshot(path_slice, extern_engine.get())));
 
 	initialized_snapshot = true;
 }
 
 void DeltaSnapshot::InitializeScan() {
-	auto snapshot_ref = snapshot->GetLockingRef();
+	auto &snapshot_ref = snapshot;
 
 	// Create Scan
 	PredicateVisitor visitor(names, &table_filters);
-	scan = TryUnpackKernelResult(ffi::scan(snapshot_ref.GetPtr(), extern_engine.get(), &visitor));
+	scan = TryUnpackKernelResult(ffi::scan(snapshot_ref.get(), extern_engine.get(), &visitor));
 
 	// Create GlobalState
 	global_state = ffi::get_global_scan_state(scan.get());
 
 	// Set version
-	this->version = ffi::version(snapshot_ref.GetPtr());
+	this->version = ffi::version(snapshot_ref.get());
 
 	// Create scan data iterator
 	scan_data_iterator = TryUnpackKernelResult(ffi::kernel_scan_data_init(extern_engine.get(), scan.get()));
@@ -541,11 +542,11 @@ unique_ptr<MultiFileList> DeltaSnapshot::ComplexFilterPushdown(ClientContext &co
 	filtered_list->table_filters = std::move(filterstmp);
 	filtered_list->names = names;
 
-	// Copy over the snapshot, this avoids reparsing metadata
-	{
-	    unique_lock<mutex> lck(lock);
-	    filtered_list->snapshot = snapshot;
-	}
+	// // Copy over the snapshot, this avoids reparsing metadata
+	// {
+	//     unique_lock<mutex> lck(lock);
+	//     filtered_list->snapshot = snapshot;
+	// }
 
 	auto &profiler = QueryProfiler::Get(context);
 
@@ -599,9 +600,10 @@ unique_ptr<MultiFileList> DeltaSnapshot::ComplexFilterPushdown(ClientContext &co
 }
 
 vector<string> DeltaSnapshot::GetAllFiles() {
+    unique_lock<mutex> lck(lock);
 	idx_t i = resolved_files.size();
 	// TODO: this can probably be improved
-	while (!GetFile(i).empty()) {
+	while (!GetFileInternal(i).empty()) {
 		i++;
 	}
 	return resolved_files;
@@ -628,6 +630,9 @@ idx_t DeltaSnapshot::GetTotalFileCount() {
 unique_ptr<NodeStatistics> DeltaSnapshot::GetCardinality(ClientContext &context) {
 	// This also ensures all files are expanded
 	auto total_file_count = DeltaSnapshot::GetTotalFileCount();
+
+    // TODO: internalize above
+    unique_lock<mutex> lck(lock);
 
 	if (total_file_count == 0) {
 		return make_uniq<NodeStatistics>(0, 0);
