@@ -66,6 +66,7 @@ protected:
 	string GetFile(idx_t i) override;
 
 protected:
+    string GetFileInternal(idx_t i);
 	void InitializeSnapshot();
 	void InitializeScan();
 

@@ -444,45 +444,48 @@ void DeltaSnapshot::Bind(vector<LogicalType> &return_types, vector<string> &name
 	this->types = return_types;
 }
 
+string DeltaSnapshot::GetFileInternal(idx_t i) {
+    if (!initialized_snapshot) {
+        InitializeSnapshot();
+    }
+
+    if (!initialized_scan) {
+        InitializeScan();
+    }
+
+    // We already have this file
+    if (i < resolved_files.size()) {
+        return resolved_files[i];
+    }
+
+    if (files_exhausted) {
+        return "";
+    }
+
+    while (i >= resolved_files.size()) {
+        auto have_scan_data_res = ffi::kernel_scan_data_next(scan_data_iterator.get(), this, VisitData);
+
+        auto have_scan_data = TryUnpackKernelResult(have_scan_data_res);
+
+        // kernel has indicated that we have no more data to scan
+        if (!have_scan_data) {
+            files_exhausted = true;
+            return "";
+        }
+    }
+
+    // The kernel scan visitor should have resolved a file OR returned
+    if (i >= resolved_files.size()) {
+        throw IOException("Delta Kernel seems to have failed to resolve a new file");
+    }
+
+    return resolved_files[i];
+}
+
 string DeltaSnapshot::GetFile(idx_t i) {
     // TODO: profile this: we should be able to use atomics here to optimize
     unique_lock<mutex> lck(lock);
-
-	if (!initialized_snapshot) {
-		InitializeSnapshot();
-	}
-
-	if (!initialized_scan) {
-		InitializeScan();
-	}
-
-	// We already have this file
-	if (i < resolved_files.size()) {
-		return resolved_files[i];
-	}
-
-	if (files_exhausted) {
-		return "";
-	}
-
-	while (i >= resolved_files.size()) {
-		auto have_scan_data_res = ffi::kernel_scan_data_next(scan_data_iterator.get(), this, VisitData);
-
-		auto have_scan_data = TryUnpackKernelResult(have_scan_data_res);
-
-		// kernel has indicated that we have no more data to scan
-		if (!have_scan_data) {
-			files_exhausted = true;
-			return "";
-		}
-	}
-
-	// The kernel scan visitor should have resolved a file OR returned
-	if (i >= resolved_files.size()) {
-		throw IOException("Delta Kernel seems to have failed to resolve a new file");
-	}
-
-	return resolved_files[i];
+    return GetFileInternal(i);
 }
 
 void DeltaSnapshot::InitializeSnapshot() {
@@ -613,9 +616,10 @@ FileExpandResult DeltaSnapshot::GetExpandResult() {
 }
 
 idx_t DeltaSnapshot::GetTotalFileCount() {
+    unique_lock<mutex> lck(lock);
 	// TODO: this can probably be improved
 	idx_t i = resolved_files.size();
-	while (!GetFile(i).empty()) {
+	while (!GetFileInternal(i).empty()) {
 		i++;
 	}
 	return resolved_files.size();
@@ -646,7 +650,7 @@ unique_ptr<NodeStatistics> DeltaSnapshot::GetCardinality(ClientContext &context)
 }
 
 idx_t DeltaSnapshot::GetVersion() {
-    // TODO: lock?
+    unique_lock<mutex> lck(lock);
     return version;
 }
 
