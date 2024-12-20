@@ -126,6 +126,16 @@ struct DeltaMultiFileReaderGlobalState : public MultiFileReaderGlobalState {
 	void SetColumnIdx(const string &column, idx_t idx);
 };
 
+class DeltaDeletionVector : public DeletionVector {
+public:
+    DeltaDeletionVector(const ffi::KernelBoolSlice &kernel_dv);
+    ~DeltaDeletionVector() override;
+    void Apply(std::bitset<STANDARD_VECTOR_SIZE> &bitset, idx_t offset_in_file, idx_t offset_in_bitset, idx_t count) const override;
+
+protected:
+    const ffi::KernelBoolSlice &kernel_dv;
+};
+
 struct DeltaMultiFileReader : public MultiFileReader {
 	static unique_ptr<MultiFileReader> CreateInstance(const TableFunction &table_function);
 	//! Return a DeltaSnapshot

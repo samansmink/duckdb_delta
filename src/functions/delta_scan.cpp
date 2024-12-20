@@ -756,6 +756,10 @@ void DeltaMultiFileReader::FinalizeBind(const MultiFileReaderOptions &file_optio
 			}
 		}
 	}
+
+    if (file_metadata.selection_vector.ptr) {
+        reader_data.deletion_vector = make_uniq<DeltaDeletionVector>(file_metadata.selection_vector);
+    }
 }
 
 shared_ptr<MultiFileList> DeltaMultiFileReader::CreateFileList(ClientContext &context, const vector<string> &paths,
@@ -811,6 +815,20 @@ void DeltaMultiFileReaderGlobalState::SetColumnIdx(const string &column, idx_t i
 		return;
 	}
 	throw IOException("Unknown column '%s' found as required by the DeltaMultiFileReader");
+}
+
+DeltaDeletionVector::DeltaDeletionVector(const ffi::KernelBoolSlice &kernel_dv_p) : kernel_dv(std::move(kernel_dv_p)){
+}
+
+DeltaDeletionVector::~DeltaDeletionVector() {
+}
+
+void DeltaDeletionVector::Apply(std::bitset<STANDARD_VECTOR_SIZE> &bitset, idx_t offset_in_file, idx_t offset_in_bitset, idx_t count) const {
+    auto max_offset = MinValue<idx_t>(kernel_dv.len, offset_in_file + count);
+    idx_t bitset_i = offset_in_bitset;
+    for (idx_t i = offset_in_file; i < max_offset; i++) {
+        bitset.set(bitset_i++, kernel_dv.ptr[i]);
+    }
 }
 
 unique_ptr<MultiFileReaderGlobalState> DeltaMultiFileReader::InitializeGlobalState(
