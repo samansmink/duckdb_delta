@@ -1014,17 +1014,17 @@ void DeltaMultiFileReader::FinalizeChunk(ClientContext &context, const MultiFile
 
 	// Get the metadata for this file
 	const auto &snapshot = dynamic_cast<const DeltaSnapshot &>(*global_state->file_list);
-	auto &metadata = snapshot.GetMetaData(reader_data.file_list_idx.GetIndex());
-
-	if (metadata.selection_vector.ptr && chunk.size() != 0) {
-		D_ASSERT(delta_global_state.file_row_number_idx != DConstants::INVALID_INDEX);
-		auto &file_row_number_column = chunk.data[delta_global_state.file_row_number_idx];
-
-		// Construct the selection vector using the file_row_number column and the raw selection vector from delta
-		idx_t select_count;
-		auto sv = DuckSVFromDeltaSV(metadata.selection_vector, file_row_number_column, chunk.size(), select_count);
-		chunk.Slice(sv, select_count);
-	}
+	// auto &metadata = snapshot.GetMetaData(reader_data.file_list_idx.GetIndex());
+	//
+	// if (metadata.selection_vector.ptr && chunk.size() != 0) {
+	// 	D_ASSERT(delta_global_state.file_row_number_idx != DConstants::INVALID_INDEX);
+	// 	auto &file_row_number_column = chunk.data[delta_global_state.file_row_number_idx];
+	//
+	// 	// Construct the selection vector using the file_row_number column and the raw selection vector from delta
+	// 	idx_t select_count;
+	// 	auto sv = DuckSVFromDeltaSV(metadata.selection_vector, file_row_number_column, chunk.size(), select_count);
+	// 	chunk.Slice(sv, select_count);
+	// }
 
 	// Note: this demo function shows how we can use DuckDB's Binder create expression-based generated columns
 	if (delta_global_state.delta_file_number_idx != DConstants::INVALID_INDEX) {
