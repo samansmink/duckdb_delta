@@ -70,11 +70,13 @@ protected:
 	void InitializeSnapshot();
 	void InitializeScan();
 
+public:
 	template <class T>
 	T TryUnpackKernelResult(ffi::ExternResult<T> result) {
 		return KernelUtils::UnpackResult<T>(
 		    result, StringUtil::Format("While trying to read from delta table: '%s'", paths[0]));
 	}
+protected:
 
 	static void VisitData(void *engine_context, ffi::ExclusiveEngineData *engine_data,
 	                      const struct ffi::KernelBoolSlice selection_vec);
@@ -89,8 +91,9 @@ protected:
 
 	//! Delta Kernel Structures
 	shared_ptr<SharedKernelSnapshot> snapshot;
-
+public:
 	KernelExternEngine extern_engine;
+protected:
 	KernelScan scan;
 	KernelGlobalScanState global_state;
 	KernelScanDataIterator scan_data_iterator;

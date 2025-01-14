@@ -188,6 +188,11 @@ con = duckdb.connect()
 con.query(f"COPY (SELECT i as id, ('val' || i::VARCHAR) as value  FROM range(0,1000000) tbl(i))TO '{TMP_PATH}/simple_sf1_with_dv.parquet'")
 generate_test_data_pyspark('simple_sf1_with_dv', 'simple_sf1_with_dv', f'{TMP_PATH}/simple_sf1_with_dv.parquet', "id % 1000 = 0")
 
+## really simple
+con = duckdb.connect()
+con.query(f"COPY (SELECT i FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple.parquet'")
+generate_test_data_pyspark('really_simple', 'really_simple', f'{TMP_PATH}/really_simple.parquet')
+
 ## Lineitem SF0.01 with deletion vector
 con = duckdb.connect()
 con.query(f"call dbgen(sf=0.01); COPY (from lineitem) TO '{TMP_PATH}/modified_lineitem_sf0_01.parquet'")

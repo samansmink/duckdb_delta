@@ -89,14 +89,6 @@ DatabaseSize DeltaCatalog::GetDatabaseSize(ClientContext &context) {
 	return size;
 }
 
-unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, LogicalInsert &op,
-                                                      unique_ptr<PhysicalOperator> plan) {
-	throw NotImplementedException("DeltaCatalog does not support inserts");
-}
-unique_ptr<PhysicalOperator> DeltaCatalog::PlanCreateTableAs(ClientContext &context, LogicalCreateTable &op,
-                                                             unique_ptr<PhysicalOperator> plan) {
-	throw NotImplementedException("DeltaCatalog does not support creating new tables");
-}
 unique_ptr<PhysicalOperator> DeltaCatalog::PlanDelete(ClientContext &context, LogicalDelete &op,
                                                       unique_ptr<PhysicalOperator> plan) {
 	throw NotImplementedException("DeltaCatalog does not support deletes");
