@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "delta_utils.hpp"
 #include "duckdb/transaction/transaction.hpp"
 
 namespace duckdb {
@@ -27,15 +28,16 @@ public:
 	void Commit();
 	void Rollback();
 
+    void Append(const vector<string> &append_files);
+
 	static DeltaTransaction &Get(ClientContext &context, Catalog &catalog);
 	AccessMode GetAccessMode() const;
 
-	void SetReadWrite() override {
-		throw NotImplementedException("Can not start read-write transaction");
-	};
-
 public:
 	unique_ptr<DeltaTableEntry> table_entry;
+    vector<string> outstanding_appends;
+
+    KernelExclusiveTransaction kernel_transaction;
 
 private:
 	//	DeltaConnection connection;

@@ -502,6 +502,9 @@ struct im_an_unused_struct_that_tricks_msvc_into_compilation {
 	ExternResult<Handle<SharedScan>> field9;
 	ExternResult<Handle<ExclusiveFileReadResultIterator>> field10;
 	ExternResult<KernelRowIndexArray> field11;
+    ExternResult<Handle<ExclusiveEngineData>> field12;
+    ExternResult<Handle<ExclusiveTransaction>> field13;
+    ExternResult<uint64_t> field14;
 };
 
 /// An `Event` can generally be thought of a "log message". It contains all the relevant bits such
