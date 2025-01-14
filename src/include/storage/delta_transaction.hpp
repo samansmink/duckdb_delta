@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "delta_utils.hpp"
 #include "duckdb/transaction/transaction.hpp"
 
 namespace duckdb {
@@ -27,12 +28,10 @@ public:
 	void Commit();
 	void Rollback();
 
+    void Append(const vector<string> &append_files);
+
 	static DeltaTransaction &Get(ClientContext &context, Catalog &catalog);
 	AccessMode GetAccessMode() const;
-
-	void SetReadWrite() override {
-		throw NotImplementedException("Can not start read-write transaction");
-	};
 
 public:
     optional_ptr<DeltaTableEntry> GetTableEntry(idx_t version);
@@ -45,6 +44,8 @@ private:
     unique_ptr<DeltaTableEntry> table_entry;
     //! Cached table entries at specific versions
     unordered_map<idx_t, unique_ptr<DeltaTableEntry>> versioned_table_entries;
+
+    vector<string> outstanding_appends;
 
 	//	DeltaConnection connection;
 	DeltaTransactionState transaction_state;

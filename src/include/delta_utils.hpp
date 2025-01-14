@@ -233,6 +233,12 @@ struct UniqueKernelPointer {
 		}
 	}
 
+    KernelType *release() {
+	    auto copy = ptr;
+        ptr = nullptr;
+	    return copy;
+	}
+
 	KernelType *get() const {
 		return ptr;
 	}
@@ -254,6 +260,8 @@ typedef TemplatedUniqueKernelPointer<ffi::SharedExternEngine, ffi::free_engine> 
 typedef TemplatedUniqueKernelPointer<ffi::SharedScan, ffi::free_scan> KernelScan;
 typedef TemplatedUniqueKernelPointer<ffi::SharedScanMetadataIterator, ffi::free_scan_metadata_iter>
     KernelScanDataIterator;
+typedef TemplatedUniqueKernelPointer<ffi::ExclusiveTransaction, ffi::free_transaction> KernelExclusiveTransaction;
+typedef TemplatedUniqueKernelPointer<ffi::ExclusiveEngineData, ffi::free_engine_data> KernelEngineData;
 
 template <typename KernelType, void (*DeleteFunction)(KernelType *)>
 struct SharedKernelPointer;
