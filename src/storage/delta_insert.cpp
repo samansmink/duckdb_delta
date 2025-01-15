@@ -20,18 +20,15 @@
 
 namespace duckdb {
 
-DeltaInsert::DeltaInsert(LogicalOperator &op, TableCatalogEntry &table_p, physical_index_vector_t<idx_t> column_index_map_p,
-    vector<LogicalType> types, CopyFunction function_p, unique_ptr<FunctionData> bind_data, idx_t estimated_cardinality) :
-    PhysicalCopyToFile(std::move(types), std::move(function_p), std::move(bind_data), estimated_cardinality), table(&table_p), schema(nullptr), column_index_map(std::move(column_index_map_p)) {
-
-    type = PhysicalOperatorType::EXTENSION;
+DeltaInsert::DeltaInsert(LogicalOperator &op, TableCatalogEntry &table,
+                     physical_index_vector_t<idx_t> column_index_map_p)
+: PhysicalOperator(PhysicalOperatorType::EXTENSION, op.types, 1), table(&table), schema(nullptr),
+  column_index_map(std::move(column_index_map_p)) {
 }
 
-DeltaInsert::DeltaInsert(LogicalOperator &op, SchemaCatalogEntry &schema_p, unique_ptr<BoundCreateTableInfo> info,
-        vector<LogicalType> types, CopyFunction function_p, unique_ptr<FunctionData> bind_data, idx_t estimated_cardinality) :
-        PhysicalCopyToFile(std::move(types), std::move(function_p), std::move(bind_data), estimated_cardinality), table(nullptr), schema(&schema_p), info(std::move(info)) {
-
-    type = PhysicalOperatorType::EXTENSION;
+DeltaInsert::DeltaInsert(LogicalOperator &op, SchemaCatalogEntry &schema, unique_ptr<BoundCreateTableInfo> info)
+    : PhysicalOperator(PhysicalOperatorType::EXTENSION, op.types, 1), table(nullptr), schema(&schema),
+      info(std::move(info)) {
 }
 
 //===--------------------------------------------------------------------===//
@@ -39,18 +36,17 @@ DeltaInsert::DeltaInsert(LogicalOperator &op, SchemaCatalogEntry &schema_p, uniq
 //===--------------------------------------------------------------------===//
 class DeltaInsertGlobalState : public GlobalSinkState {
 public:
-	explicit DeltaInsertGlobalState(ClientContext &context, DeltaTableEntry &table,
-	                                const vector<LogicalType> &varchar_types)
-	    : table(table), insert_count(0) {
+	explicit DeltaInsertGlobalState()
+	    : insert_count(0) {
 	}
-
-	DeltaTableEntry &table;
-	idx_t insert_count;
+    vector<string> written_files;
+	idx_t insert_count; // TODO: this needs to be per file
 };
 
-// unique_ptr<GlobalSinkState> DeltaInsert::GetGlobalSinkState(ClientContext &context) const {
-// 	return physical_copy_to_file->GetGlobalSinkState(context);
-// }
+unique_ptr<GlobalSinkState> DeltaInsert::GetGlobalSinkState(ClientContext &context) const {
+	return make_uniq<DeltaInsertGlobalState>();
+}
+
 //
 // unique_ptr<LocalSinkState> DeltaInsert::GetLocalSinkState(ExecutionContext &context) const {
 //     return physical_copy_to_file->GetLocalSinkState(context);
@@ -59,47 +55,45 @@ public:
 //===--------------------------------------------------------------------===//
 // Sink
 //===--------------------------------------------------------------------===//
-// SinkResultType DeltaInsert::Sink(ExecutionContext &context, DataChunk &chunk, OperatorSinkInput &input) const {
-//     return physical_copy_to_file->Sink(context, chunk, input);
-// }
-//
-// SinkCombineResultType DeltaInsert::Combine(ExecutionContext &context, OperatorSinkCombineInput &input) const {
-//     return physical_copy_to_file->Combine(context, input);
-// }
+SinkResultType DeltaInsert::Sink(ExecutionContext &context, DataChunk &chunk, OperatorSinkInput &input) const {
+    auto &global_state = input.global_state.Cast<DeltaInsertGlobalState>();
+
+    if (chunk.size() != 1) {
+        throw InternalException("DeltaInsert::Sink expects a single row containing output of the PhysicalCopy that should be its Source");
+    }
+
+    global_state.insert_count += chunk.GetValue(0,0).GetValue<idx_t>();
+
+    auto files = chunk.GetValue(1, 0);
+    for (const auto &val : ListValue::GetChildren(files)) {
+        global_state.written_files.push_back(val.ToString());
+    }
+
+    return SinkResultType::NEED_MORE_INPUT;
+}
 
 //===--------------------------------------------------------------------===//
 // GetData
 //===--------------------------------------------------------------------===//
 SourceResultType DeltaInsert::GetData(ExecutionContext &context, DataChunk &chunk, OperatorSourceInput &input) const {
-    DataChunk intermediate_chunk;
-    vector<LogicalType> intermediate_schema = {LogicalType::BIGINT, LogicalType::LIST(LogicalType::VARCHAR)};
-    intermediate_chunk.Initialize(context.client, intermediate_schema, 1);
-    auto res = PhysicalCopyToFile::GetData(context, intermediate_chunk, input);
-    chunk.data[0].Reference(intermediate_chunk.GetValue(0,0));
-    return res;
+    auto &global_state = sink_state->Cast<DeltaInsertGlobalState>();
+    auto value = Value::BIGINT(global_state.insert_count);
+    chunk.SetCardinality(1);
+    chunk.SetValue(0, 0, value);
+    return SourceResultType::FINISHED;
 }
 //===--------------------------------------------------------------------===//
 // Finalize
 //===--------------------------------------------------------------------===//
 SinkFinalizeType DeltaInsert::Finalize(Pipeline &pipeline, Event &event, ClientContext &context,
                                        OperatorSinkFinalizeInput &input) const {
-    // Call base class to finalize the PhysicalCopy
-    auto res = PhysicalCopyToFile::Finalize(pipeline, event, context, input);
-
-    if (res != SinkFinalizeType::READY) {
-        throw NotImplementedException("Unknown SinkFinalizeType in DeltaInsert::Finalize: %s", EnumUtil::ToString(res));
-    }
-
-    auto &copy_global_state = input.global_state.Cast<CopyToFunctionGlobalState>();
+    auto &global_state = input.global_state.Cast<DeltaInsertGlobalState>();
 
     auto &transaction = DeltaTransaction::Get(context, table->catalog);
     vector<string> filenames;
-    for (const auto& filename : copy_global_state.file_names) {
-        filenames.push_back(filename.ToString());
-    }
-    transaction.Append(filenames);
+    transaction.Append(global_state.written_files);
 
-    return res;
+    return SinkFinalizeType::READY;
 }
 
 //===--------------------------------------------------------------------===//
@@ -159,22 +153,25 @@ unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, Lo
     CopyFunctionBindInput bind_input(*info);
     auto function_data = copy_fun->function.copy_to_bind(context, bind_input, columns.GetColumnNames(), columns.GetColumnTypes());
 
-    auto insert = make_uniq<DeltaInsert>(op, op.table, op.column_index_map,
-        GetCopyFunctionReturnLogicalTypes(CopyFunctionReturnType::CHANGED_ROWS_AND_FILE_LIST), copy_fun->function, std::move(function_data), op.estimated_cardinality);
+    auto insert = make_uniq<DeltaInsert>(op, op.table, op.column_index_map);;
 
-    insert->use_tmp_file = false;
-    insert->file_path = delta_path;
-    insert->filename_pattern.SetFilenamePattern("duckdb_data_file_{uuid}");
-    insert->file_extension = "parquet";
-    insert->overwrite_mode = CopyOverwriteMode::COPY_OVERWRITE_OR_IGNORE;
-    insert->per_thread_output = true;
-    insert->rotate = false;
-    insert->return_type = CopyFunctionReturnType::CHANGED_ROWS_AND_FILE_LIST;
-    insert->partition_output = false;
-    insert->write_partition_columns = false;
-    insert->names = {};
-    insert->expected_types = columns.GetColumnTypes();
-    insert->children.push_back(std::move(plan));
+    auto physical_copy = make_uniq<PhysicalCopyToFile>(GetCopyFunctionReturnLogicalTypes(CopyFunctionReturnType::CHANGED_ROWS_AND_FILE_LIST), copy_fun->function, std::move(function_data), op.estimated_cardinality);
+
+    physical_copy->use_tmp_file = false;
+    physical_copy->file_path = delta_path + "/duckdb-" + UUID::ToString(UUID::GenerateRandomUUID()) + ".parquet";
+    // physical_copy->filename_pattern.SetFilenamePattern("duckdb_data_file_{uuid}");
+    physical_copy->file_extension = "parquet";
+    physical_copy->overwrite_mode = CopyOverwriteMode::COPY_OVERWRITE_OR_IGNORE;
+    physical_copy->per_thread_output = false;
+    physical_copy->rotate = false;
+    physical_copy->return_type = CopyFunctionReturnType::CHANGED_ROWS_AND_FILE_LIST;
+    physical_copy->partition_output = false;
+    physical_copy->write_partition_columns = false;
+    physical_copy->names = {};
+    physical_copy->expected_types = columns.GetColumnTypes();
+    physical_copy->children.push_back(std::move(plan));
+
+    insert->children.push_back(std::move(physical_copy));
 
 	return std::move(insert);
 }

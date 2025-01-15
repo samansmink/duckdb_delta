@@ -15,13 +15,12 @@
 
 namespace duckdb {
 
-class DeltaInsert : public PhysicalCopyToFile {
+class DeltaInsert : public PhysicalOperator {
 public:
-    DeltaInsert(LogicalOperator &op, TableCatalogEntry &table_p, physical_index_vector_t<idx_t> column_index_map_p,
-        vector<LogicalType> types, CopyFunction function_p, unique_ptr<FunctionData> bind_data, idx_t estimated_cardinality);
-
-    DeltaInsert(LogicalOperator &op, SchemaCatalogEntry &schema_p, unique_ptr<BoundCreateTableInfo> info,
-        vector<LogicalType> types, CopyFunction function_p, unique_ptr<FunctionData> bind_data, idx_t estimated_cardinality);
+    //! INSERT INTO
+    DeltaInsert(LogicalOperator &op, TableCatalogEntry &table, physical_index_vector_t<idx_t> column_index_map);
+    //! CREATE TABLE AS
+    DeltaInsert(LogicalOperator &op, SchemaCatalogEntry &schema, unique_ptr<BoundCreateTableInfo> info);
 
 	//! The table to insert into
 	optional_ptr<TableCatalogEntry> table;
@@ -37,31 +36,27 @@ public:
 public:
 	// // Source interface
 	SourceResultType GetData(ExecutionContext &context, DataChunk &chunk, OperatorSourceInput &input) const override;
-	//
-	// bool IsSource() const override {
-	// 	return true;
-	// }
+
+	bool IsSource() const override {
+		return true;
+	}
 
 public:
 	// Sink interface
-    // SinkResultType Sink(ExecutionContext &context, DataChunk &chunk, OperatorSinkInput &input) const override;
+    SinkResultType Sink(ExecutionContext &context, DataChunk &chunk, OperatorSinkInput &input) const override;
     // SinkCombineResultType Combine(ExecutionContext &context, OperatorSinkCombineInput &input) const override;
     SinkFinalizeType Finalize(Pipeline &pipeline, Event &event, ClientContext &context,
                               OperatorSinkFinalizeInput &input) const override;
     // unique_ptr<LocalSinkState> GetLocalSinkState(ExecutionContext &context) const override;
-    // unique_ptr<GlobalSinkState> GetGlobalSinkState(ClientContext &context) const override;
+    unique_ptr<GlobalSinkState> GetGlobalSinkState(ClientContext &context) const override;
 
-	// bool IsSink() const override {
-	// 	return true;
-	// }
- //
-	// bool ParallelSink() const override {
-	// 	return true;
-	// }
- //
- //    bool SinkOrderDependent() const override {
-	//     return true;
-	// }
+	bool IsSink() const override {
+		return true;
+	}
+
+	bool ParallelSink() const override {
+		return false;
+	}
 
 	string GetName() const override;
 	InsertionOrderPreservingMap<string> ParamsToString() const override;
