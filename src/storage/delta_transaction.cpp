@@ -1,4 +1,7 @@
 #include "storage/delta_transaction.hpp"
+
+#include <duckdb/main/client_data.hpp>
+
 #include "storage/delta_catalog.hpp"
 #include "duckdb/main/client_properties.hpp"
 #include "duckdb/common/arrow/arrow_converter.hpp"
@@ -45,12 +48,14 @@ struct CommitInfo {
         }
 
         buffer.SetValue(0, current_size, commit_info_map);
+        buffer.SetCardinality(current_size+1);
     }
 
-    ffi::ArrowFFIData ToArrow() {
+    ffi::ArrowFFIData ToArrow(ClientContext &context) {
+        buffer.Print();
         ffi::ArrowFFIData ffi_data;
         unordered_map<idx_t, const shared_ptr<ArrowTypeExtensionData>> extension_types;
-        ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, nullptr);
+        ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, context);
         ArrowConverter::ToArrowArray(buffer, (ArrowArray*)(&ffi_data.array), props, extension_types);
         ArrowConverter::ToArrowSchema((ArrowSchema*)(&ffi_data.schema), GetTypes(), GetNames(), props);
         return ffi_data;
@@ -96,12 +101,14 @@ struct WriteMetaData {
         buffer.SetValue(2, current_size, Value::BIGINT(size));
         buffer.SetValue(3, current_size, Value::BIGINT(modification_time));
         buffer.SetValue(4, current_size, data_change);
+        buffer.SetCardinality(current_size+1);
     }
 
-    ffi::ArrowFFIData ToArrow() {
+    ffi::ArrowFFIData ToArrow(ClientContext &context) {
+        buffer.Print();
         ffi::ArrowFFIData ffi_data;
         unordered_map<idx_t, const shared_ptr<ArrowTypeExtensionData>> extension_types;
-        ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, nullptr);
+        ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, context);
         ArrowConverter::ToArrowArray(buffer, (ArrowArray*)(&ffi_data.array), props, extension_types);
         ArrowConverter::ToArrowSchema((ArrowSchema*)(&ffi_data.schema), GetTypes(), GetNames(), props);
         return ffi_data;
@@ -110,15 +117,15 @@ struct WriteMetaData {
     DataChunk buffer;
 };
 
-void DeltaTransaction::Commit() {
+void DeltaTransaction::Commit(ClientContext &context) {
 	if (transaction_state == DeltaTransactionState::TRANSACTION_STARTED) {
 		transaction_state = DeltaTransactionState::TRANSACTION_FINISHED;
 
 	    if (!outstanding_appends.empty()) {
 	        // Create commit info
 	        CommitInfo commit_info;
-	        commit_info.Append(Value::MAP(LogicalType::VARCHAR, LogicalType::VARCHAR, {Value("engineInfo")}, {Value("default engine")}));
-	        auto commit_info_arrow = commit_info.ToArrow();
+	        commit_info.Append(Value::MAP(LogicalType::VARCHAR, LogicalType::VARCHAR, {Value("engineInfo")}, {Value("DuckDB")}));
+	        auto commit_info_arrow = commit_info.ToArrow(context);
 
 	        // Convert arrow to Engine Data
 	        KernelEngineData commit_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(&commit_info_arrow, table_entry->snapshot->extern_engine.get()));
@@ -128,23 +135,29 @@ void DeltaTransaction::Commit() {
 	        auto write_context = ffi::get_write_context(transction_with_info.get());
 	        auto write_schema = ffi::get_write_schema(write_context);
 	        auto write_path = ffi::get_write_path(write_context, allocate_string);
+	        string write_path_string;
 	        if (write_path) {
-	            (string*)write_path;
-	            // TODO use write path?
+	            write_path_string = *(string*)write_path;
 	            delete (string*)write_path;
 	        }
 
 	        WriteMetaData meta_data;
 	        for (const auto &file : outstanding_appends) {
 	            // TODO: how to figure out how many tuples we've written?
-	            meta_data.Append(file, Value(), 1, Timestamp::GetCurrentTimestamp().value, true);
+	            // TODO: fix paths
+	            auto file_without_double_slash = StringUtil::Replace(file, "\\", "/");
+	            auto file_split = StringUtil::Split(file, "/");
+	            auto file_name = file_split[file_split.size()-1];
+	            unordered_map<string, string> partitions = {};
+	            meta_data.Append(file_name, Value::MAP(partitions), 1, Timestamp::GetCurrentTimestamp().value, true);
 	        }
 
-	        auto write_metadata_ffi = meta_data.ToArrow();
+	        auto write_metadata_ffi = meta_data.ToArrow(context);
+
 	        KernelEngineData write_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(&write_metadata_ffi, table_entry->snapshot->extern_engine.get()));
 	        ffi::add_write_metadata(transction_with_info.get(), write_info_engine_data.release());
 
-	        ffi::commit(transction_with_info.release(), table_entry->snapshot->extern_engine.get());
+	        auto commit_res = table_entry->snapshot->TryUnpackKernelResult(ffi::commit(transction_with_info.release(), table_entry->snapshot->extern_engine.get()));
 	    }
 	}
 }

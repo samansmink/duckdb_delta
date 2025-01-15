@@ -68,6 +68,17 @@ public:
 // }
 
 //===--------------------------------------------------------------------===//
+// GetData
+//===--------------------------------------------------------------------===//
+SourceResultType DeltaInsert::GetData(ExecutionContext &context, DataChunk &chunk, OperatorSourceInput &input) const {
+    DataChunk intermediate_chunk;
+    vector<LogicalType> intermediate_schema = {LogicalType::BIGINT, LogicalType::LIST(LogicalType::VARCHAR)};
+    intermediate_chunk.Initialize(context.client, intermediate_schema, 1);
+    auto res = PhysicalCopyToFile::GetData(context, intermediate_chunk, input);
+    chunk.data[0].Reference(intermediate_chunk.GetValue(0,0));
+    return res;
+}
+//===--------------------------------------------------------------------===//
 // Finalize
 //===--------------------------------------------------------------------===//
 SinkFinalizeType DeltaInsert::Finalize(Pipeline &pipeline, Event &event, ClientContext &context,
@@ -149,7 +160,7 @@ unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, Lo
     auto function_data = copy_fun->function.copy_to_bind(context, bind_input, columns.GetColumnNames(), columns.GetColumnTypes());
 
     auto insert = make_uniq<DeltaInsert>(op, op.table, op.column_index_map,
-        GetCopyFunctionReturnLogicalTypes(CopyFunctionReturnType::CHANGED_ROWS), copy_fun->function, std::move(function_data), op.estimated_cardinality);
+        GetCopyFunctionReturnLogicalTypes(CopyFunctionReturnType::CHANGED_ROWS_AND_FILE_LIST), copy_fun->function, std::move(function_data), op.estimated_cardinality);
 
     insert->use_tmp_file = false;
     insert->file_path = delta_path;
@@ -158,7 +169,7 @@ unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, Lo
     insert->overwrite_mode = CopyOverwriteMode::COPY_OVERWRITE_OR_IGNORE;
     insert->per_thread_output = true;
     insert->rotate = false;
-    insert->return_type = CopyFunctionReturnType::CHANGED_ROWS;
+    insert->return_type = CopyFunctionReturnType::CHANGED_ROWS_AND_FILE_LIST;
     insert->partition_output = false;
     insert->write_partition_columns = false;
     insert->names = {};
