@@ -25,7 +25,7 @@ public:
 	~DeltaTransaction() override;
 
 	void Start();
-	void Commit();
+	void Commit(ClientContext &context);
 	void Rollback();
 
     void Append(const vector<string> &append_files);
