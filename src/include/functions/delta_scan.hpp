@@ -60,6 +60,7 @@ public:
 	unique_ptr<NodeStatistics> GetCardinality(ClientContext &context) override;
 	idx_t GetVersion();
 	DeltaFileMetaData &GetMetaData(idx_t index) const;
+    vector<string> GetPartitions();
 
 protected:
 	//! Get the i-th expanded file
@@ -83,6 +84,7 @@ protected:
 	static void VisitCallback(ffi::NullableCvoid engine_context, struct ffi::KernelStringSlice path, int64_t size,
 	                          const ffi::Stats *stats, const ffi::DvInfo *dv_info,
 	                          const struct ffi::CStringMap *partition_values);
+    static void VisitPartitionIteratorCallback(ffi::NullableCvoid engine_context, ffi::KernelStringSlice slice);
 
 protected:
 	mutable mutex lock;
@@ -97,6 +99,8 @@ protected:
 	KernelScan scan;
 	KernelGlobalScanState global_state;
 	KernelScanDataIterator scan_data_iterator;
+
+    vector<string> partitions;
 
 	//! Names
 	vector<string> names;

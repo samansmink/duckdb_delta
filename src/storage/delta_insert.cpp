@@ -1,5 +1,7 @@
 #include "storage/delta_insert.hpp"
 
+#include <duckdb/common/sort/partition_state.hpp>
+
 #include "duckdb/catalog/catalog_entry/copy_function_catalog_entry.hpp"
 #include "duckdb/main/client_data.hpp"
 #include "duckdb/main/extension_util.hpp"
@@ -148,28 +150,61 @@ unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, Lo
         throw MissingExtensionException("Did not find parquet copy function required to write to delta table");
     }
 
+    auto partitions = op.table.Cast<DeltaTableEntry>().snapshot->GetPartitions();
+    vector<idx_t> partition_columns;
+    if (partitions.size() != 0) {
+        auto column_names = op.table.Cast<DeltaTableEntry>().GetColumns().GetColumnNames();
+        // TODO: yuck?
+        for (int64_t i = 0; i < partitions.size(); i++) {
+            for (int64_t j = 0; j < column_names.size(); j++) {
+                if (column_names[j] == partitions[i]) {
+                    partition_columns.push_back(j);
+                    break;
+                }
+            }
+        }
+    }
+
+
     // Bind Copy Function
     auto &columns = op.table.Cast<DeltaTableEntry>().GetColumns();
     CopyFunctionBindInput bind_input(*info);
-    auto function_data = copy_fun->function.copy_to_bind(context, bind_input, columns.GetColumnNames(), columns.GetColumnTypes());
+
+    // auto names_to_write = LogicalCopyToFile::GetNamesWithoutPartitions(columns.GetColumnNames(), partition_columns, false);
+    // auto types_to_write = LogicalCopyToFile::GetTypesWithoutPartitions(columns.GetColumnTypes(), partition_columns, false);
+
+    auto names_to_write = columns.GetColumnNames();
+    auto types_to_write = columns.GetColumnTypes();
+
+
+    auto function_data = copy_fun->function.copy_to_bind(context, bind_input, names_to_write, types_to_write);
 
     auto insert = make_uniq<DeltaInsert>(op, op.table, op.column_index_map);;
 
     auto physical_copy = make_uniq<PhysicalCopyToFile>(GetCopyFunctionReturnLogicalTypes(CopyFunctionReturnType::CHANGED_ROWS_AND_FILE_LIST), copy_fun->function, std::move(function_data), op.estimated_cardinality);
 
+    auto current_write_uuid = UUID::ToString(UUID::GenerateRandomUUID());
+
     physical_copy->use_tmp_file = false;
-    physical_copy->file_path = delta_path + "/duckdb-" + UUID::ToString(UUID::GenerateRandomUUID()) + ".parquet";
-    // physical_copy->filename_pattern.SetFilenamePattern("duckdb_data_file_{uuid}");
+    if (!partition_columns.empty()) {
+        physical_copy->filename_pattern.SetFilenamePattern("duckdb_" + current_write_uuid + "_{i}");
+        physical_copy->file_path = delta_path;
+        physical_copy->partition_output = true;
+        physical_copy->partition_columns = partition_columns;
+    } else {
+        physical_copy->file_path = delta_path + "/duckdb-" + current_write_uuid + ".parquet";
+        physical_copy->partition_output = false;
+    }
+
     physical_copy->file_extension = "parquet";
     physical_copy->overwrite_mode = CopyOverwriteMode::COPY_OVERWRITE_OR_IGNORE;
     physical_copy->per_thread_output = false;
     physical_copy->rotate = false;
     physical_copy->return_type = CopyFunctionReturnType::CHANGED_ROWS_AND_FILE_LIST;
-    physical_copy->partition_output = false;
-    physical_copy->write_partition_columns = false;
-    physical_copy->names = {};
-    physical_copy->expected_types = columns.GetColumnTypes();
+    physical_copy->write_partition_columns = true; // TODO this is wrong! we don't write partition in delta
     physical_copy->children.push_back(std::move(plan));
+    physical_copy->names = names_to_write;
+    physical_copy->expected_types = types_to_write;
 
     insert->children.push_back(std::move(physical_copy));
 

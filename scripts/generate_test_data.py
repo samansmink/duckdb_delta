@@ -98,7 +98,7 @@ def generate_test_data_delta_rs(path, query, part_column=False, add_golden_table
         else:
             con.sql(f"COPY test_table to '{generated_path}/duckdb/data.parquet' (FORMAT parquet)")
 
-def generate_test_data_pyspark(name, current_path, input_path, delete_predicate = False):
+def generate_test_data_pyspark(name, current_path, input_path, delete_predicate = False, partition_column = ''):
     """
     generate_test_data_pyspark generates some test data using pyspark and duckdb
 
@@ -130,9 +130,11 @@ def generate_test_data_pyspark(name, current_path, input_path, delete_predicate 
     ## DATA GENERATION
     # df = spark.read.parquet(input_path)
     # df.write.format("delta").mode("overwrite").save(delta_table_path)
-    spark.sql(f"CREATE TABLE test_table_{name} USING delta LOCATION '{delta_table_path}' AS SELECT * FROM parquet.`{input_path}`")
+    if (partition_column):
+        spark.sql(f"CREATE TABLE test_table_{name} USING delta PARTITIONED BY ({partition_column}) LOCATION '{delta_table_path}' AS SELECT * FROM parquet.`{input_path}`")
 
     spark.sql(f"ALTER TABLE test_table_{name} SET TBLPROPERTIES ('delta.minReaderVersion' = '3', 'delta.minWriterVersion' = '7');")
+
 
     ## CREATE
     ## CONFIGURE USAGE OF DELETION VECTORS
@@ -194,6 +196,11 @@ generate_test_data_pyspark('simple_sf1_with_dv', 'simple_sf1_with_dv', f'{TMP_PA
 con = duckdb.connect()
 con.query(f"COPY (SELECT i FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple.parquet'")
 generate_test_data_pyspark('really_simple', 'really_simple', f'{TMP_PATH}/really_simple.parquet')
+
+## really simple
+con = duckdb.connect()
+con.query(f"COPY (SELECT i, i%2 as part FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple_partitioned.parquet'")
+generate_test_data_pyspark('really_simple_partitioned', 'really_simple_partitioned', f'{TMP_PATH}/really_simple_partitioned.parquet', partition_column='part')
 
 ## Lineitem SF0.01 with deletion vector
 con = duckdb.connect()

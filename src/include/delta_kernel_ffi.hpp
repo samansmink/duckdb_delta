@@ -838,7 +838,7 @@ ExternResult<Handle<ExclusiveEngineData>> get_engine_data(ArrowFFIData *data,
 
 /// Call the engine back with the next `EngingeData` batch read by Parquet/Json handler. The
 /// _engine_ "owns" the data that is passed into the `engine_visitor`, since it is allocated by the
-/// `Engine` being used for log-replay. If the engine wants the kernel to free this data, it _must_
+/// `Engine` being used for log-replay. If the engine wants the kernel to  free this data, it _must_
 /// call [`free_engine_data`] on it.
 ///
 /// # Safety

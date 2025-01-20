@@ -91,6 +91,11 @@ void DeltaSnapshot::VisitCallback(ffi::NullableCvoid engine_context, struct ffi:
 	context->metadata.back()->partition_map = std::move(constant_map);
 }
 
+void DeltaSnapshot::VisitPartitionIteratorCallback(ffi::NullableCvoid engine_context, ffi::KernelStringSlice slice) {
+    auto context = (DeltaSnapshot *)engine_context;
+    context->partitions.push_back(KernelUtils::FromDeltaString(slice));
+}
+
 void DeltaSnapshot::VisitData(void *engine_context, ffi::ExclusiveEngineData *engine_data,
                               const struct ffi::KernelBoolSlice selection_vec) {
 	ffi::visit_scan_data(engine_data, selection_vec, engine_context, VisitCallback);
@@ -514,6 +519,14 @@ void DeltaSnapshot::InitializeScan() {
 	scan_data_iterator = TryUnpackKernelResult(ffi::kernel_scan_data_init(extern_engine.get(), scan.get()));
 
 	initialized_scan = true;
+
+    // Get partitions
+    auto partitions = ffi::get_partition_column_count(global_state.get());
+    if (partitions) {
+        auto partition_iterator = ffi::get_partition_columns(global_state.get());
+        while(ffi::string_slice_next(partition_iterator, this, VisitPartitionIteratorCallback)) {
+        }
+    }
 }
 
 unique_ptr<MultiFileList> DeltaSnapshot::ComplexFilterPushdown(ClientContext &context,
@@ -650,7 +663,21 @@ unique_ptr<NodeStatistics> DeltaSnapshot::GetCardinality(ClientContext &context)
 
 idx_t DeltaSnapshot::GetVersion() {
 	unique_lock<mutex> lck(lock);
-	return version;
+    return version;
+}
+
+
+vector<string> DeltaSnapshot::GetPartitions() {
+    unique_lock<mutex> lck(lock);
+    if (!initialized_snapshot) {
+        InitializeSnapshot();
+    }
+
+    if (!initialized_scan) {
+        InitializeScan();
+    }
+
+    return partitions;
 }
 
 DeltaFileMetaData &DeltaSnapshot::GetMetaData(idx_t index) const {
