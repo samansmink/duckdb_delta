@@ -36,6 +36,11 @@ TableFunction DeltaTableEntry::GetScanFunctionInternal(ClientContext &context, u
     auto delta_scan_function = delta_function_set.functions.GetFunctionByArguments(context, {LogicalType::VARCHAR});
     auto &delta_catalog = catalog.Cast<DeltaCatalog>();
 
+    auto &transaction = DeltaTransaction::Get(context, delta_catalog);
+    if (!transaction.outstanding_appends.empty()) {
+        throw CatalogException("Scanning a table with uncommitted writes is not supported");
+    }
+
     // Copy over the internal kernel snapshot
     auto function_info = make_shared_ptr<DeltaFunctionInfo>();
 

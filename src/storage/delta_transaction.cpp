@@ -52,7 +52,6 @@ struct CommitInfo {
     }
 
     ffi::ArrowFFIData ToArrow(ClientContext &context) {
-        buffer.Print();
         ffi::ArrowFFIData ffi_data;
         unordered_map<idx_t, const shared_ptr<ArrowTypeExtensionData>> extension_types;
         ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, context);
@@ -105,7 +104,6 @@ struct WriteMetaData {
     }
 
     ffi::ArrowFFIData ToArrow(ClientContext &context) {
-        buffer.Print();
         ffi::ArrowFFIData ffi_data;
         unordered_map<idx_t, const shared_ptr<ArrowTypeExtensionData>> extension_types;
         ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, context);
@@ -145,9 +143,11 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	        for (const auto &file : outstanding_appends) {
 	            // TODO: how to figure out how many tuples we've written?
 	            // TODO: fix paths
+	            auto table_path = table_entry->snapshot->GetPaths()[0];
 	            auto file_without_double_slash = StringUtil::Replace(file, "\\", "/");
-	            auto file_split = StringUtil::Split(file, "/");
-	            auto file_name = file_split[file_split.size()-1];
+	            // auto file_split = StringUtil::Split(file, "/");
+	            // auto file_name = file_split[file_split.size()-1];
+	            auto file_name = file.substr(table_path.size());
 	            unordered_map<string, string> partitions = {};
 	            meta_data.Append(file_name, Value::MAP(partitions), 1, Timestamp::GetCurrentTimestamp().value, true);
 	        }
@@ -161,10 +161,12 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	    }
 	}
 }
+
 void DeltaTransaction::Rollback() {
 	if (transaction_state == DeltaTransactionState::TRANSACTION_STARTED) {
 		transaction_state = DeltaTransactionState::TRANSACTION_FINISHED;
 		// NOP: we only support read-only transactions currently
+	    // TODO: can we delete files we've written when aborting?
 	}
 }
 
