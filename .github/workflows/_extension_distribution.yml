@@ -578,7 +578,7 @@ jobs:
           DUCKDB_PLATFORM: ${{ matrix.duckdb_arch }}
           DUCKDB_PLATFORM_RTOOLS: ${{ (matrix.duckdb_arch == 'windows_amd64_rtools' || matrix.duckdb_arch == 'windows_amd64_mingw') && 1 || 0 }}
         run: |
-          make release
+          make debug
 
       - name: Test extension
         if: ${{ inputs.skip_tests == false }}
@@ -586,7 +586,7 @@ jobs:
           DUCKDB_PLATFORM: ${{ matrix.duckdb_arch }}
           DUCKDB_PLATFORM_RTOOLS: ${{ (matrix.duckdb_arch == 'windows_amd64_rtools' || matrix.duckdb_arch == 'windows_amd64_mingw') && 1 || 0 }}
         run: |
-          make test_release
+          make test_debug
 
       - uses: actions/upload-artifact@v4
         with:
