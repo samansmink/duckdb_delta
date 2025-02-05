@@ -134,6 +134,7 @@ set(DELTA_KERNEL_FFI_HEADER_CXX
 )
 
 add_compile_options("/bigobj")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
 
 # Add rust_example as a CMake target
 ExternalProject_Add(
