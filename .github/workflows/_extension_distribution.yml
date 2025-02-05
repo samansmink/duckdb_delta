@@ -431,13 +431,13 @@ jobs:
       - name: Build extension
         shell: bash
         run: |
-          make release
+          make debug
 
       - name: Test Extension
         if: ${{ matrix.osx_build_arch == 'arm64' && inputs.skip_tests == false }}
         shell: bash
         run: |
-          make test_release
+          make test_debug
 
       - uses: actions/upload-artifact@v4
         with:
