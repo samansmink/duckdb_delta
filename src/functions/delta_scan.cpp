@@ -791,6 +791,14 @@ idx_t DeltaSnapshot::GetVersion() {
 
 DeltaFileMetaData &DeltaSnapshot::GetMetaData(idx_t index) const {
 	unique_lock<mutex> lck(lock);
+
+    if (!initialized_snapshot) {
+        InitializeSnapshot();
+    }
+    if (!initialized_scan) {
+        InitializeScan();
+    }
+
 	return *metadata[index];
 }
 
