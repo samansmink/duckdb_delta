@@ -133,6 +133,8 @@ set(DELTA_KERNEL_FFI_HEADER_CXX
     "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers/delta_kernel_ffi.hpp"
 )
 
+add_compile_options("/bigobj")
+
 # Add rust_example as a CMake target
 ExternalProject_Add(
   ${KERNEL_NAME}
