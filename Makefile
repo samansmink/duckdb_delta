@@ -27,6 +27,8 @@ ifeq (${BUILD_BENCHMARK}, 1)
 	TOOLCHAIN_FLAGS:=${TOOLCHAIN_FLAGS} -DBUILD_BENCHMARKS=1
 endif
 
+TOOLCHAIN_FLAGS:=${TOOLCHAIN_FLAGS}  -DDISABLE_UNITY=1
+
 # Include the Makefile from extension-ci-tools
 include extension-ci-tools/makefiles/duckdb_extension.Makefile
 
