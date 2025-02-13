@@ -1,0 +1,27 @@
+CREATE SECRET IF NOT EXISTS s1 (type s3, provider credential_chain);
+SET VARIABLE delta_path = 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark';
+
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/call_center/delta_lake' as call_center (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/catalog_page/delta_lake' as catalog_page (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/catalog_returns/delta_lake' as catalog_returns (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/catalog_sales/delta_lake' as catalog_sales (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/customer/delta_lake' as customer (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/customer_demographics/delta_lake' as customer_demographics (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/customer_address/delta_lake' as customer_address (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/date_dim/delta_lake' as date_dim (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/household_demographics/delta_lake' as household_demographics (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/inventory/delta_lake' as inventory (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/income_band/delta_lake' as income_band (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/item/delta_lake' as item (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/promotion/delta_lake' as promotion (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/reason/delta_lake' as reason (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/ship_mode/delta_lake' as ship_mode (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/store/delta_lake' as store (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/store_returns/delta_lake' as store_returns (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/store_sales/delta_lake' as store_sales (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/time_dim/delta_lake' as time_dim (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/warehouse/delta_lake' as warehouse (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/web_page/delta_lake' as web_page (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/web_returns/delta_lake' as web_returns (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/web_sales/delta_lake' as web_sales (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
+ATTACH 's3://test-bucket-ceiveran/delta_benchmarking/tpcds_sf1_pyspark/web_site/delta_lake' as web_site (TYPE delta, PUSHDOWN_FILTERS 'all', PUSHDOWN_PARTITION_INFO 1);
