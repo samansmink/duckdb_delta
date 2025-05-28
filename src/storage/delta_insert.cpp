@@ -6,7 +6,7 @@
 #include "duckdb/main/client_data.hpp"
 #include "duckdb/main/extension_util.hpp"
 #include "duckdb/planner/operator/logical_copy_to_file.hpp"
-#include "functions/delta_scan.hpp"
+#include "functions/delta_scan/delta_scan.hpp"
 #include "duckdb/execution/physical_operator_states.hpp"
 
 #include "storage/delta_catalog.hpp"
@@ -19,6 +19,7 @@
 #include "duckdb/execution/operator/scan/physical_table_scan.hpp"
 #include "duckdb/planner/expression/bound_cast_expression.hpp"
 #include "duckdb/planner/expression/bound_reference_expression.hpp"
+#include "functions/delta_scan/delta_multi_file_list.hpp"
 
 namespace duckdb {
 
@@ -127,8 +128,7 @@ static optional_ptr<CopyFunctionCatalogEntry> TryGetCopyFunction(DatabaseInstanc
     return schema.GetEntry(data, CatalogType::COPY_FUNCTION_ENTRY, name)->Cast<CopyFunctionCatalogEntry>();
 }
 
-unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, LogicalInsert &op,
-                                                      unique_ptr<PhysicalOperator> plan) {
+PhysicalOperator &DeltaCatalog::PlanInsert(ClientContext &context, PhysicalPlanGenerator &planner, LogicalInsert &op, optional_ptr<PhysicalOperator> plan) {
 	if (op.return_chunk) {
 		throw BinderException("RETURNING clause not yet supported for insertion into Delta table");
 	}
@@ -136,7 +136,7 @@ unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, Lo
 		throw BinderException("ON CONFLICT clause not yet supported for insertion into Delta table");
 	}
 
-    string delta_path =  op.table.Cast<DeltaTableEntry>().snapshot->GetPaths()[0]; // TODO unsafe?
+    string delta_path =  op.table.Cast<DeltaTableEntry>().snapshot->GetPaths()[0].path; // TODO unsafe?
 
     // Create Copy Info
     auto info = make_uniq<CopyInfo>();
@@ -150,20 +150,21 @@ unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, Lo
         throw MissingExtensionException("Did not find parquet copy function required to write to delta table");
     }
 
-    auto partitions = op.table.Cast<DeltaTableEntry>().snapshot->GetPartitions();
-    vector<idx_t> partition_columns;
-    if (partitions.size() != 0) {
-        auto column_names = op.table.Cast<DeltaTableEntry>().GetColumns().GetColumnNames();
-        // TODO: yuck?
-        for (int64_t i = 0; i < partitions.size(); i++) {
-            for (int64_t j = 0; j < column_names.size(); j++) {
-                if (column_names[j] == partitions[i]) {
-                    partition_columns.push_back(j);
-                    break;
-                }
-            }
-        }
-    }
+    // TODO restore
+    // auto partitions = op.table.Cast<DeltaTableEntry>().snapshot->GetPartitions();
+    // vector<idx_t> partition_columns;
+    // if (partitions.size() != 0) {
+    //     auto column_names = op.table.Cast<DeltaTableEntry>().GetColumns().GetColumnNames();
+    //     // TODO: yuck?
+    //     for (int64_t i = 0; i < partitions.size(); i++) {
+    //         for (int64_t j = 0; j < column_names.size(); j++) {
+    //             if (column_names[j] == partitions[i]) {
+    //                 partition_columns.push_back(j);
+    //                 break;
+    //             }
+    //         }
+    //     }
+    // }
 
 
     // Bind Copy Function
@@ -179,7 +180,7 @@ unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, Lo
 
     auto function_data = copy_fun->function.copy_to_bind(context, bind_input, names_to_write, types_to_write);
 
-    auto insert = make_uniq<DeltaInsert>(op, op.table, op.column_index_map);;
+    auto &insert = planner.Make<DeltaInsert>(op, op.table, op.column_index_map);
 
     auto physical_copy = make_uniq<PhysicalCopyToFile>(GetCopyFunctionReturnLogicalTypes(CopyFunctionReturnType::CHANGED_ROWS_AND_FILE_LIST), copy_fun->function, std::move(function_data), op.estimated_cardinality);
 
@@ -208,7 +209,7 @@ unique_ptr<PhysicalOperator> DeltaCatalog::PlanInsert(ClientContext &context, Lo
 
     insert->children.push_back(std::move(physical_copy));
 
-	return std::move(insert);
+	return insert.;
 }
 
 unique_ptr<PhysicalOperator> DeltaCatalog::PlanCreateTableAs(ClientContext &context, LogicalCreateTable &op,
