@@ -1,20 +1,17 @@
 #include "storage/delta_schema_entry.hpp"
 
-#include "functions/delta_scan.hpp"
+#include "functions/delta_scan/delta_multi_file_list.hpp"
 #include "storage/delta_catalog.hpp"
 
 #include "delta_extension.hpp"
 
 #include "storage/delta_table_entry.hpp"
 #include "storage/delta_transaction.hpp"
-#include "duckdb/parser/parsed_data/create_view_info.hpp"
 #include "duckdb/parser/parsed_data/create_index_info.hpp"
 #include "duckdb/planner/parsed_data/bound_create_table_info.hpp"
 #include "duckdb/parser/parsed_data/drop_info.hpp"
 #include "duckdb/parser/constraints/list.hpp"
 #include "duckdb/common/unordered_set.hpp"
-#include "duckdb/parser/parsed_data/alter_info.hpp"
-#include "duckdb/parser/parsed_data/alter_table_info.hpp"
 #include "duckdb/parser/parsed_expression_iterator.hpp"
 
 namespace duckdb {
@@ -95,7 +92,7 @@ void DeltaSchemaEntry::Alter(CatalogTransaction transaction, AlterInfo &info) {
 	throw NotImplementedException("Delta tables do not support altering");
 }
 
-bool CatalogTypeIsSupported(CatalogType type) {
+static bool CatalogTypeIsSupported(CatalogType type) {
 	switch (type) {
 	case CatalogType::TABLE_ENTRY:
 		return true;
@@ -104,9 +101,9 @@ bool CatalogTypeIsSupported(CatalogType type) {
 	}
 }
 
-static unique_ptr<DeltaTableEntry> CreateTableEntry(ClientContext &context, DeltaCatalog &delta_catalog,
-                                                    DeltaSchemaEntry &schema_entry) {
-	auto snapshot = make_shared_ptr<DeltaSnapshot>(context, delta_catalog.GetDBPath());
+unique_ptr<DeltaTableEntry> DeltaSchemaEntry::CreateTableEntry(ClientContext &context) {
+	auto &delta_catalog = catalog.Cast<DeltaCatalog>();
+	auto snapshot = make_shared_ptr<DeltaMultiFileList>(context, delta_catalog.GetDBPath());
 
 	// Get the names and types from the delta snapshot
 	vector<LogicalType> return_types;
@@ -117,8 +114,8 @@ static unique_ptr<DeltaTableEntry> CreateTableEntry(ClientContext &context, Delt
 	for (idx_t i = 0; i < return_types.size(); i++) {
 		table_info.columns.AddColumn(ColumnDefinition(names[i], return_types[i]));
 	}
-	table_info.table = DEFAULT_DELTA_TABLE;
-	auto table_entry = make_uniq<DeltaTableEntry>(delta_catalog, schema_entry, table_info);
+	table_info.table = delta_catalog.GetName();
+	auto table_entry = make_uniq<DeltaTableEntry>(delta_catalog, *this, table_info);
 	table_entry->snapshot = std::move(snapshot);
 
 	return table_entry;
@@ -126,14 +123,16 @@ static unique_ptr<DeltaTableEntry> CreateTableEntry(ClientContext &context, Delt
 
 void DeltaSchemaEntry::Scan(ClientContext &context, CatalogType type,
                             const std::function<void(CatalogEntry &)> &callback) {
-	if (!CatalogTypeIsSupported(type)) {
+	if (CatalogTypeIsSupported(type)) {
 		auto transaction = catalog.GetCatalogTransaction(context);
-		auto default_table = GetEntry(transaction, type, DEFAULT_DELTA_TABLE);
+		auto lookup_info = EntryLookupInfo(type, catalog.GetName());
+		auto default_table = LookupEntry(transaction, lookup_info);
 		if (default_table) {
 			callback(*default_table);
 		}
 	}
 }
+
 void DeltaSchemaEntry::Scan(CatalogType type, const std::function<void(CatalogEntry &)> &callback) {
 	throw NotImplementedException("Scan without context not supported");
 }
@@ -142,33 +141,34 @@ void DeltaSchemaEntry::DropEntry(ClientContext &context, DropInfo &info) {
 	throw NotImplementedException("Delta tables do not support dropping");
 }
 
-optional_ptr<CatalogEntry> DeltaSchemaEntry::GetEntry(CatalogTransaction transaction, CatalogType type,
-                                                      const string &name) {
+optional_ptr<CatalogEntry> DeltaSchemaEntry::LookupEntry(CatalogTransaction transaction,
+                                                         const EntryLookupInfo &lookup_info) {
 	if (!transaction.HasContext()) {
 		throw NotImplementedException("Can not DeltaSchemaEntry::GetEntry without context");
 	}
 	auto &context = transaction.GetContext();
 
-	if (type == CatalogType::TABLE_ENTRY && name == DEFAULT_DELTA_TABLE) {
+	auto type = lookup_info.GetCatalogType();
+	auto &name = lookup_info.GetEntryName();
+	if (type == CatalogType::TABLE_ENTRY && name == catalog.GetName()) {
 		auto &delta_transaction = GetDeltaTransaction(transaction);
 		auto &delta_catalog = catalog.Cast<DeltaCatalog>();
 
-		if (delta_transaction.table_entry) {
-			return *delta_transaction.table_entry;
+		auto transaction_table_entry = delta_transaction.GetTableEntry();
+		if (transaction_table_entry) {
+			return *transaction_table_entry;
 		}
 
 		if (delta_catalog.UseCachedSnapshot()) {
 			unique_lock<mutex> l(lock);
 			if (!cached_table) {
-				cached_table = CreateTableEntry(context, delta_catalog, *this);
+				cached_table = CreateTableEntry(context);
 			}
 			return *cached_table;
 		}
 
-		delta_transaction.table_entry = CreateTableEntry(context, delta_catalog, *this);
-		return *delta_transaction.table_entry;
+		return delta_transaction.InitializeTableEntry(context, *this);
 	}
-
 	return nullptr;
 }
 

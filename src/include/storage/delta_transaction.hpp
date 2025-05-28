@@ -15,7 +15,7 @@ namespace duckdb {
 class DeltaCatalog;
 class DeltaSchemaEntry;
 class DeltaTableEntry;
-struct DeltaSnapshot;
+class DeltaMultiFileList;
 
 enum class DeltaTransactionState { TRANSACTION_NOT_YET_STARTED, TRANSACTION_STARTED, TRANSACTION_FINISHED };
 
@@ -34,12 +34,15 @@ public:
 	AccessMode GetAccessMode() const;
 
 public:
-	unique_ptr<DeltaTableEntry> table_entry;
+	optional_ptr<DeltaTableEntry> GetTableEntry();
+	DeltaTableEntry &InitializeTableEntry(ClientContext &context, DeltaSchemaEntry &schema_entry);
+
     vector<string> outstanding_appends;
 
-    KernelExclusiveTransaction kernel_transaction;
-
 private:
+	mutex lock;
+	unique_ptr<DeltaTableEntry> table_entry;
+
 	//	DeltaConnection connection;
 	DeltaTransactionState transaction_state;
 	AccessMode access_mode;

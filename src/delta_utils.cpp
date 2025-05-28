@@ -1,18 +1,18 @@
 #include "delta_utils.hpp"
 
-#include <duckdb/common/exception/conversion_exception.hpp>
+#include "delta_log_types.hpp"
+#include "duckdb/common/operator/decimal_cast_operators.hpp"
 
 #include "duckdb.hpp"
+#include "duckdb/common/types/decimal.hpp"
 #include "duckdb/main/extension_util.hpp"
 #include "duckdb/main/database.hpp"
-
-#include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
-#include <duckdb/planner/filter/null_filter.hpp>
+#include "duckdb/parser/parsed_data/create_scalar_function_info.hpp"
+#include "duckdb/common/exception/conversion_exception.hpp"
 #include "duckdb/parser/expression/conjunction_expression.hpp"
 #include "duckdb/parser/expression/comparison_expression.hpp"
 #include "duckdb/parser/expression/function_expression.hpp"
 #include "duckdb/parser/expression/operator_expression.hpp"
-#include "duckdb/common/types/decimal.hpp"
 
 namespace duckdb {
 
@@ -31,9 +31,7 @@ void ExpressionVisitor::VisitComparisonExpression(void *state, uintptr_t sibling
 	state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
 
-unique_ptr<vector<unique_ptr<ParsedExpression>>>
-ExpressionVisitor::VisitKernelExpression(const ffi::Handle<ffi::SharedExpression> *expression) {
-	ExpressionVisitor state;
+ffi::EngineExpressionVisitor ExpressionVisitor::CreateVisitor(ExpressionVisitor &state) {
 	ffi::EngineExpressionVisitor visitor;
 
 	visitor.data = &state;
@@ -88,6 +86,28 @@ ExpressionVisitor::VisitKernelExpression(const ffi::Handle<ffi::SharedExpression
 
 	visitor.visit_not = &VisitNotExpression;
 	visitor.visit_is_null = &VisitIsNullExpression;
+
+	return visitor;
+}
+
+unique_ptr<vector<unique_ptr<ParsedExpression>>>
+ExpressionVisitor::VisitKernelExpression(const ffi::Expression *expression) {
+	ExpressionVisitor state;
+	auto visitor = CreateVisitor(state);
+
+	uintptr_t result = ffi::visit_expression_ref(expression, &visitor);
+
+	if (state.error.HasError()) {
+		state.error.Throw();
+	}
+
+	return state.TakeFieldList(result);
+}
+
+unique_ptr<vector<unique_ptr<ParsedExpression>>>
+ExpressionVisitor::VisitKernelExpression(const ffi::Handle<ffi::SharedExpression> *expression) {
+	ExpressionVisitor state;
+	auto visitor = CreateVisitor(state);
 
 	uintptr_t result = ffi::visit_expression(expression, &visitor);
 
@@ -257,14 +277,33 @@ void ExpressionVisitor::VisitIsNullExpression(void *state, uintptr_t sibling_lis
 	state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
 
-// FIXME: this is not 100% correct yet: value_ms is ignored
-void ExpressionVisitor::VisitDecimalLiteral(void *state, uintptr_t sibling_list_id, uint64_t value_ms,
-                                            uint64_t value_ls, uint8_t precision, uint8_t scale) {
+// This function is a workaround for the fact that duckdb disallows using hugeints to store decimals with precision < 18
+// whereas kernel does allow this.
+static int64_t GetTruncatedDecimalValue(int64_t value_ms, uint64_t value_ls) {
+	// First trim msb from lower half
+	auto new_value_ls = value_ls << 1;
+	new_value_ls = new_value_ls >> 1;
+
+	// Now cast the lower half to signed
+	auto lower_cast = UnsafeNumericCast<int64_t>(value_ls);
+
+	// If value_ms was negative, we need to invert
+	if (value_ms < 0) {
+		lower_cast = -lower_cast;
+	}
+	return lower_cast;
+}
+
+void ExpressionVisitor::VisitDecimalLiteral(void *state, uintptr_t sibling_list_id, int64_t value_ms, uint64_t value_ls,
+                                            uint8_t precision, uint8_t scale) {
 	try {
-		if (precision >= Decimal::MAX_WIDTH_INT64 || value_ls > (uint64_t)NumericLimits<int64_t>::Maximum()) {
-			throw NotImplementedException("ExpressionVisitor::VisitDecimalLiteral HugeInt decimals");
+		Value decimal_value;
+		if (precision < Decimal::MAX_WIDTH_INT64) {
+			decimal_value = Value::DECIMAL(GetTruncatedDecimalValue(value_ms, value_ls), precision, scale);
+		} else {
+			decimal_value = Value::DECIMAL({value_ms, value_ls}, precision, scale);
 		}
-		auto expression = make_uniq<ConstantExpression>(Value::DECIMAL(42, 18, 10));
+		auto expression = make_uniq<ConstantExpression>(decimal_value);
 		static_cast<ExpressionVisitor *>(state)->AppendToList(sibling_list_id, std::move(expression));
 	} catch (Exception &e) {
 		static_cast<ExpressionVisitor *>(state)->error = ErrorData(e);
@@ -272,12 +311,27 @@ void ExpressionVisitor::VisitDecimalLiteral(void *state, uintptr_t sibling_list_
 }
 
 void ExpressionVisitor::VisitColumnExpression(void *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name) {
-	auto expression = make_uniq<ColumnRefExpression>(string(name.ptr, name.len));
+	auto col_ref_string = string(name.ptr, name.len);
+
+	// Delta ColRefs are sometimes backtick-ed
+	if (col_ref_string[0] == '`' && col_ref_string[col_ref_string.size() - 1] == '`') {
+		col_ref_string = col_ref_string.substr(1, col_ref_string.size() - 2);
+	}
+
+	auto expression = make_uniq<ColumnRefExpression>(col_ref_string);
 	static_cast<ExpressionVisitor *>(state)->AppendToList(sibling_list_id, std::move(expression));
 }
+
 void ExpressionVisitor::VisitStructExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
-	static_cast<ExpressionVisitor *>(state)->AppendToList(sibling_list_id,
-	                                                      std::move(make_uniq<ConstantExpression>(Value(42))));
+	auto state_cast = static_cast<ExpressionVisitor *>(state);
+
+	auto children_values = state_cast->TakeFieldList(child_list_id);
+	if (!children_values) {
+		return;
+	}
+
+	unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("struct_pack", std::move(*children_values));
+	state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
 
 uintptr_t ExpressionVisitor::MakeFieldList(ExpressionVisitor *state, uintptr_t capacity_hint) {
@@ -314,16 +368,23 @@ unique_ptr<ExpressionVisitor::FieldList> ExpressionVisitor::TakeFieldList(uintpt
 	return rval;
 }
 
-unique_ptr<SchemaVisitor::FieldList> SchemaVisitor::VisitSnapshotSchema(ffi::SharedSnapshot *snapshot) {
-	SchemaVisitor state;
+ffi::EngineSchemaVisitor SchemaVisitor::CreateSchemaVisitor(SchemaVisitor &state) {
 	ffi::EngineSchemaVisitor visitor;
 
 	visitor.data = &state;
 	visitor.make_field_list = (uintptr_t(*)(void *, uintptr_t)) & MakeFieldList;
-	visitor.visit_struct = (void (*)(void *, uintptr_t, ffi::KernelStringSlice, uintptr_t)) & VisitStruct;
-	visitor.visit_array = (void (*)(void *, uintptr_t, ffi::KernelStringSlice, bool, uintptr_t)) & VisitArray;
-	visitor.visit_map = (void (*)(void *, uintptr_t, ffi::KernelStringSlice, bool, uintptr_t)) & VisitMap;
-	visitor.visit_decimal = (void (*)(void *, uintptr_t, ffi::KernelStringSlice, uint8_t, uint8_t)) & VisitDecimal;
+	visitor.visit_struct =
+	    (void (*)(void *, uintptr_t, ffi::KernelStringSlice, bool, const ffi::CStringMap *metadata, uintptr_t)) &
+	    VisitStruct;
+	visitor.visit_array =
+	    (void (*)(void *, uintptr_t, ffi::KernelStringSlice, bool, const ffi::CStringMap *metadata, uintptr_t)) &
+	    VisitArray;
+	visitor.visit_map =
+	    (void (*)(void *, uintptr_t, ffi::KernelStringSlice, bool, const ffi::CStringMap *metadata, uintptr_t)) &
+	    VisitMap;
+	visitor.visit_decimal =
+	    (void (*)(void *, uintptr_t, ffi::KernelStringSlice, bool, const ffi::CStringMap *metadata, uint8_t, uint8_t)) &
+	    VisitDecimal;
 	visitor.visit_string = VisitSimpleType<LogicalType::VARCHAR>();
 	visitor.visit_long = VisitSimpleType<LogicalType::BIGINT>();
 	visitor.visit_integer = VisitSimpleType<LogicalType::INTEGER>();
@@ -337,12 +398,48 @@ unique_ptr<SchemaVisitor::FieldList> SchemaVisitor::VisitSnapshotSchema(ffi::Sha
 	visitor.visit_timestamp = VisitSimpleType<LogicalType::TIMESTAMP_TZ>();
 	visitor.visit_timestamp_ntz = VisitSimpleType<LogicalType::TIMESTAMP>();
 
-	uintptr_t result = visit_schema(snapshot, &visitor);
+	return visitor;
+}
+
+unique_ptr<SchemaVisitor::FieldList> SchemaVisitor::VisitSnapshotSchema(ffi::SharedSnapshot *snapshot) {
+	SchemaVisitor state;
+	auto visitor = CreateSchemaVisitor(state);
+
+	auto schema = logical_schema(snapshot);
+	uintptr_t result = visit_schema(schema, &visitor);
+	free_schema(schema);
+
+	if (state.error.HasError()) {
+		state.error.Throw();
+	}
+
 	return state.TakeFieldList(result);
 }
 
+unique_ptr<SchemaVisitor::FieldList> SchemaVisitor::VisitSnapshotGlobalReadSchema(ffi::SharedGlobalScanState *state,
+                                                                                  bool logical) {
+	SchemaVisitor visitor_state;
+	auto visitor = CreateSchemaVisitor(visitor_state);
+
+	ffi::Handle<ffi::SharedSchema> schema;
+	if (logical) {
+		schema = ffi::get_global_logical_schema(state);
+	} else {
+		schema = ffi::get_global_read_schema(state);
+	}
+
+	uintptr_t result = visit_schema(schema, &visitor);
+	free_schema(schema);
+
+	if (visitor_state.error.HasError()) {
+		visitor_state.error.Throw();
+	}
+
+	return visitor_state.TakeFieldList(result);
+}
+
 void SchemaVisitor::VisitDecimal(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
-                                 uint8_t precision, uint8_t scale) {
+                                 bool is_nullable, const ffi::CStringMap *metadata, uint8_t precision, uint8_t scale) {
 	state->AppendToList(sibling_list_id, name, LogicalType::DECIMAL(precision, scale));
 }
 
@@ -351,13 +448,13 @@ uintptr_t SchemaVisitor::MakeFieldList(SchemaVisitor *state, uintptr_t capacity_
 }
 
 void SchemaVisitor::VisitStruct(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
-                                uintptr_t child_list_id) {
+                                bool is_nullable, const ffi::CStringMap *metadata, uintptr_t child_list_id) {
 	auto children = state->TakeFieldList(child_list_id);
 	state->AppendToList(sibling_list_id, name, LogicalType::STRUCT(std::move(*children)));
 }
 
 void SchemaVisitor::VisitArray(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
-                               bool contains_null, uintptr_t child_list_id) {
+                               bool is_nullable, const ffi::CStringMap *metadata, uintptr_t child_list_id) {
 	auto children = state->TakeFieldList(child_list_id);
 
 	D_ASSERT(children->size() == 1);
@@ -365,7 +462,7 @@ void SchemaVisitor::VisitArray(SchemaVisitor *state, uintptr_t sibling_list_id, 
 }
 
 void SchemaVisitor::VisitMap(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
-                             bool contains_null, uintptr_t child_list_id) {
+                             bool is_nullable, const ffi::CStringMap *metadata, uintptr_t child_list_id) {
 	auto children = state->TakeFieldList(child_list_id);
 
 	D_ASSERT(children->size() == 2);
@@ -385,7 +482,8 @@ uintptr_t SchemaVisitor::MakeFieldListImpl(uintptr_t capacity_hint) {
 void SchemaVisitor::AppendToList(uintptr_t id, ffi::KernelStringSlice name, LogicalType &&child) {
 	auto it = inflight_lists.find(id);
 	if (it == inflight_lists.end()) {
-		throw InternalException("Unhandled error in SchemaVisitor::AppendToList child");
+		error = ErrorData(ExceptionType::INTERNAL, "Unhandled error in SchemaVisitor::AppendToList");
+		return;
 	}
 	it->second->emplace_back(std::make_pair(string(name.ptr, name.len), std::move(child)));
 }
@@ -393,7 +491,8 @@ void SchemaVisitor::AppendToList(uintptr_t id, ffi::KernelStringSlice name, Logi
 unique_ptr<SchemaVisitor::FieldList> SchemaVisitor::TakeFieldList(uintptr_t id) {
 	auto it = inflight_lists.find(id);
 	if (it == inflight_lists.end()) {
-		throw InternalException("Unhandled error in SchemaVisitor::TakeFieldList");
+		error = ErrorData(ExceptionType::INTERNAL, "Unhandled error in SchemaVisitor::TakeFieldList");
+		return make_uniq<SchemaVisitor::FieldList>();
 	}
 	auto rval = std::move(it->second);
 	inflight_lists.erase(it);
@@ -461,7 +560,7 @@ string DuckDBEngineError::KernelErrorEnumToString(ffi::KernelError err) {
 	return StringUtil::Format("EnumOutOfRange (enum val out of range: %d)", (int)err);
 }
 
-void DuckDBEngineError::Throw(string from_where) {
+string DuckDBEngineError::IntoString() {
 	// Make copies before calling delete this
 	auto etype_copy = etype;
 	auto message_copy = error_message;
@@ -469,9 +568,7 @@ void DuckDBEngineError::Throw(string from_where) {
 	// Consume error by calling delete this (remember this error is created by
 	// kernel using AllocateError)
 	delete this;
-	throw IOException("Hit DeltaKernel FFI error (from: %s): Hit error: %u (%s) "
-	                  "with message (%s)",
-	                  from_where.c_str(), etype_copy, KernelErrorEnumToString(etype_copy), message_copy);
+	return StringUtil::Format("DeltKernel %s (%u): %s", KernelErrorEnumToString(etype_copy), etype_copy, message_copy);
 }
 
 ffi::KernelStringSlice KernelUtils::ToDeltaString(const string &str) {
@@ -488,7 +585,27 @@ vector<bool> KernelUtils::FromDeltaBoolSlice(const struct ffi::KernelBoolSlice s
 	return result;
 }
 
-PredicateVisitor::PredicateVisitor(const vector<string> &column_names, optional_ptr<TableFilterSet> filters) {
+vector<unique_ptr<ParsedExpression>> &
+KernelUtils::UnpackTopLevelStruct(const vector<unique_ptr<ParsedExpression>> &parsed_expression) {
+	if (parsed_expression.size() != 1) {
+		throw IOException("Unexpected size of transformation expression returned by delta kernel: %d",
+		                  parsed_expression.size());
+	}
+
+	const auto &root_expression = parsed_expression.get(0);
+	if (root_expression->type != ExpressionType::FUNCTION) {
+		throw IOException("Unexpected type of root expression returned by delta kernel: %d", root_expression->type);
+	}
+
+	if (root_expression->Cast<FunctionExpression>().function_name != "struct_pack") {
+		throw IOException("Unexpected function of root expression returned by delta kernel: %s",
+		                  root_expression->Cast<FunctionExpression>().function_name);
+	}
+
+	return root_expression->Cast<FunctionExpression>().children;
+}
+
+PredicateVisitor::PredicateVisitor(const vector<string> &column_names, optional_ptr<const TableFilterSet> filters) {
 	predicate = this;
 	visitor = (uintptr_t(*)(void *, ffi::KernelExpressionVisitorState *)) & VisitPredicate;
 
@@ -534,7 +651,13 @@ uintptr_t PredicateVisitor::VisitConstantFilter(const string &col_name, const Co
                                                 ffi::KernelExpressionVisitorState *state) {
 	auto maybe_left =
 	    ffi::visit_expression_column(state, KernelUtils::ToDeltaString(col_name), DuckDBEngineError::AllocateError);
-	uintptr_t left = KernelUtils::UnpackResult(maybe_left, "VisitConstantFilter failed to visit_expression_column");
+
+	uintptr_t left;
+	auto left_res = KernelUtils::TryUnpackResult(maybe_left, left);
+	if (left_res.HasError()) {
+		error_data = left_res;
+		return ~0;
+	}
 
 	uintptr_t right = ~0;
 	auto &value = filter.constant;
@@ -566,7 +689,11 @@ uintptr_t PredicateVisitor::VisitConstantFilter(const string &col_name, const Co
 		auto str = StringValue::Get(value);
 		auto maybe_right = ffi::visit_expression_literal_string(state, KernelUtils::ToDeltaString(str),
 		                                                        DuckDBEngineError::AllocateError);
-		right = KernelUtils::UnpackResult(maybe_right, "VisitConstantFilter failed to visit_expression_literal_string");
+		auto right_res = KernelUtils::TryUnpackResult(maybe_right, right);
+		if (right_res.HasError()) {
+			error_data = right_res;
+			return ~0;
+		}
 		break;
 	}
 	default:
@@ -587,7 +714,7 @@ uintptr_t PredicateVisitor::VisitConstantFilter(const string &col_name, const Co
 		return visit_expression_eq(state, left, right);
 
 	default:
-		std::cout << " Unsupported operation: " << (int)filter.comparison_type << std::endl;
+		// TODO: add more types
 		return ~0; // Unsupported operation
 	}
 }
@@ -611,7 +738,13 @@ uintptr_t PredicateVisitor::VisitAndFilter(const string &col_name, const Conjunc
 uintptr_t PredicateVisitor::VisitIsNull(const string &col_name, ffi::KernelExpressionVisitorState *state) {
 	auto maybe_inner =
 	    ffi::visit_expression_column(state, KernelUtils::ToDeltaString(col_name), DuckDBEngineError::AllocateError);
-	uintptr_t inner = KernelUtils::UnpackResult(maybe_inner, "VisitIsNull failed to visit_expression_column");
+	uintptr_t inner;
+
+	auto err = KernelUtils::TryUnpackResult(maybe_inner, inner);
+	if (err.HasError()) {
+		error_data = err;
+		return ~0;
+	}
 	return ffi::visit_expression_is_null(state, inner);
 }
 
@@ -647,20 +780,11 @@ void LoggerCallback::CallbackEvent(ffi::Event event) {
 	auto &instance = GetInstance();
 	auto db_locked = instance.db.lock();
 	if (db_locked) {
-		auto transformed_log_level = GetDuckDBLogLevel(event.level);
-		string constructed_log_message;
-		Logger::Log("delta.Kernel", *db_locked, transformed_log_level, [&]() {
-			auto log_type = KernelUtils::FromDeltaString(event.target);
-			auto message = KernelUtils::FromDeltaString(event.message);
-			auto file = KernelUtils::FromDeltaString(event.file);
-			if (!file.empty()) {
-				constructed_log_message = StringUtil::Format("[%s] %s@%u : %s ", log_type, file, event.line, message);
-			} else {
-				constructed_log_message = message;
-			}
-
-			return constructed_log_message.c_str();
-		});
+		// Note: this slightly offbeat invocation of logging API is because we are passing through the log level instead
+		// of using the same
+		//       log level for every message of this log type. We may
+		DUCKDB_LOG_INTERNAL(*db_locked, DeltaKernelLogType::NAME, GetDuckDBLogLevel(event.level),
+		                    DeltaKernelLogType::ConstructLogMessage(event));
 	}
 }
 
@@ -676,6 +800,8 @@ LogLevel LoggerCallback::GetDuckDBLogLevel(ffi::Level level) {
 		return LogLevel::LOG_WARN;
 	case ffi::Level::ERROR:
 		return LogLevel::LOG_ERROR;
+	default:
+		throw InternalException("Unknown log level");
 	}
 }
 

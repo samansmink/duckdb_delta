@@ -23,6 +23,8 @@ class ExpressionVisitor : public ffi::EngineExpressionVisitor {
 public:
 	unique_ptr<vector<unique_ptr<ParsedExpression>>>
 	VisitKernelExpression(const ffi::Handle<ffi::SharedExpression> *expression);
+	unique_ptr<vector<unique_ptr<ParsedExpression>>> VisitKernelExpression(const ffi::Expression *expression);
+	ffi::EngineExpressionVisitor CreateVisitor(ExpressionVisitor &state);
 
 private:
 	unordered_map<uintptr_t, unique_ptr<FieldList>> inflight_lists;
@@ -60,7 +62,7 @@ private:
 	static void VisitArrayLiteral(void *state, uintptr_t sibling_list_id, uintptr_t child_id);
 	static void VisitStructLiteral(void *data, uintptr_t sibling_list_id, uintptr_t child_field_list_value,
 	                               uintptr_t child_value_list_id);
-	static void VisitDecimalLiteral(void *state, uintptr_t sibling_list_id, uint64_t value_ms, uint64_t value_ls,
+	static void VisitDecimalLiteral(void *state, uintptr_t sibling_list_id, int64_t value_ms, uint64_t value_ls,
 	                                uint8_t precision, uint8_t scale);
 	static void VisitColumnExpression(void *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name);
 	static void VisitStructExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
@@ -135,31 +137,38 @@ public:
 	using FieldList = child_list_t<LogicalType>;
 
 	static unique_ptr<FieldList> VisitSnapshotSchema(ffi::SharedSnapshot *snapshot);
+	static unique_ptr<FieldList> VisitSnapshotGlobalReadSchema(ffi::SharedGlobalScanState *state, bool logical);
 
 private:
 	unordered_map<uintptr_t, unique_ptr<FieldList>> inflight_lists;
 	uintptr_t next_id = 1;
 
-	typedef void(SimpleTypeVisitorFunction)(void *, uintptr_t, ffi::KernelStringSlice);
+	ErrorData error;
+
+	static ffi::EngineSchemaVisitor CreateSchemaVisitor(SchemaVisitor &state);
+
+	typedef void(SimpleTypeVisitorFunction)(void *, uintptr_t, ffi::KernelStringSlice, bool is_nullable,
+	                                        const ffi::CStringMap *metadata);
 
 	template <LogicalTypeId TypeId>
 	static SimpleTypeVisitorFunction *VisitSimpleType() {
 		return (SimpleTypeVisitorFunction *)&VisitSimpleTypeImpl<TypeId>;
 	}
 	template <LogicalTypeId TypeId>
-	static void VisitSimpleTypeImpl(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name) {
+	static void VisitSimpleTypeImpl(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
+	                                bool is_nullable, const ffi::CStringMap *metadata) {
 		state->AppendToList(sibling_list_id, name, TypeId);
 	}
 
 	static void VisitDecimal(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
-	                         uint8_t precision, uint8_t scale);
+	                         bool is_nullable, const ffi::CStringMap *metadata, uint8_t precision, uint8_t scale);
 	static uintptr_t MakeFieldList(SchemaVisitor *state, uintptr_t capacity_hint);
 	static void VisitStruct(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
-	                        uintptr_t child_list_id);
+	                        bool is_nullable, const ffi::CStringMap *metadata, uintptr_t child_list_id);
 	static void VisitArray(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
-	                       bool contains_null, uintptr_t child_list_id);
-	static void VisitMap(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
-	                     bool contains_null, uintptr_t child_list_id);
+	                       bool is_nullable, const ffi::CStringMap *metadata, uintptr_t child_list_id);
+	static void VisitMap(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name, bool is_nullable,
+	                     const ffi::CStringMap *metadata, uintptr_t child_list_id);
 
 	uintptr_t MakeFieldListImpl(uintptr_t capacity_hint);
 	void AppendToList(uintptr_t id, ffi::KernelStringSlice name, LogicalType &&child);
@@ -173,8 +182,8 @@ struct DuckDBEngineError : ffi::EngineError {
 	// Convert a kernel error enum to a string
 	static string KernelErrorEnumToString(ffi::KernelError err);
 
-	// Throw the error as an IOException
-	[[noreturn]] void Throw(string from_info);
+	// Return the error as a string (WARNING: consumes the object by calling `delete this`)
+	string IntoString();
 
 	// The error message from Kernel
 	string error_message;
@@ -307,27 +316,32 @@ struct KernelUtils {
 	static string FromDeltaString(const struct ffi::KernelStringSlice slice);
 	static vector<bool> FromDeltaBoolSlice(const struct ffi::KernelBoolSlice slice);
 
-	// TODO: all kernel results need to be unpacked, not doing so will result in an error. This should be cleaned up
+	// Unpacks (and frees) a kernel result, either storing the result in out_value, or setting error_data
 	template <class T>
-	static T UnpackResult(ffi::ExternResult<T> result, const string &from_where) {
+	static ErrorData TryUnpackResult(ffi::ExternResult<T> result, T &out_value) {
 		if (result.tag == ffi::ExternResult<T>::Tag::Err) {
 			if (result.err._0) {
 				auto error_cast = static_cast<DuckDBEngineError *>(result.err._0);
-				error_cast->Throw(from_where);
+				return ErrorData(ExceptionType::IO, error_cast->IntoString());
 			}
-			throw IOException("Hit DeltaKernel FFI error (from: %s): Hit error, but error was nullptr",
-			                  from_where.c_str());
+			return ErrorData(ExceptionType::IO, StringUtil::Format("Unknown Delta kernel error"));
 		}
 		if (result.tag == ffi::ExternResult<T>::Tag::Ok) {
-			return result.ok._0;
+			out_value = result.ok._0;
+			return {};
 		}
-		throw IOException("Invalid error ExternResult tag found!");
+		return ErrorData(ExceptionType::IO, "Invalid Delta kernel ExternResult");
 	}
+
+	static vector<unique_ptr<ParsedExpression>> &
+	UnpackTopLevelStruct(const vector<unique_ptr<ParsedExpression>> &parsed_expression);
 };
 
 class PredicateVisitor : public ffi::EnginePredicate {
 public:
-	PredicateVisitor(const vector<string> &column_names, optional_ptr<TableFilterSet> filters);
+	PredicateVisitor(const vector<string> &column_names, optional_ptr<const TableFilterSet> filters);
+
+	ErrorData error_data;
 
 private:
 	unordered_map<string, TableFilter *> column_filters;

@@ -13,6 +13,7 @@
 
 namespace duckdb {
 class DeltaTransaction;
+class DeltaCatalog;
 
 class DeltaSchemaEntry : public SchemaCatalogEntry {
 public:
@@ -38,9 +39,11 @@ public:
 	void Scan(ClientContext &context, CatalogType type, const std::function<void(CatalogEntry &)> &callback) override;
 	void Scan(CatalogType type, const std::function<void(CatalogEntry &)> &callback) override;
 	void DropEntry(ClientContext &context, DropInfo &info) override;
-	optional_ptr<CatalogEntry> GetEntry(CatalogTransaction transaction, CatalogType type, const string &name) override;
+	optional_ptr<CatalogEntry> LookupEntry(CatalogTransaction transaction, const EntryLookupInfo &lookup_info) override;
 
 	optional_ptr<DeltaTableEntry> GetCachedTable();
+
+	unique_ptr<DeltaTableEntry> CreateTableEntry(ClientContext &context);
 
 private:
 	//! Delta tables may be cached in the SchemaEntry. Since the TableEntry holds the snapshot, this allows sharing a

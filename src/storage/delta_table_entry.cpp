@@ -1,11 +1,7 @@
+#include "functions/delta_scan/delta_scan.hpp"
 #include "storage/delta_catalog.hpp"
-#include "storage/delta_schema_entry.hpp"
 #include "storage/delta_table_entry.hpp"
 
-#include "delta_utils.hpp"
-#include "functions/delta_scan.hpp"
-
-#include "storage/delta_transaction.hpp"
 #include "duckdb/storage/statistics/base_statistics.hpp"
 #include "duckdb/storage/table_storage_info.hpp"
 #include "duckdb/main/extension_util.hpp"
@@ -13,10 +9,6 @@
 #include "duckdb/main/secret/secret_manager.hpp"
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
 #include "duckdb/parser/tableref/table_function_ref.hpp"
-#include "../../duckdb/third_party/catch/catch.hpp"
-#include "functions/delta_scan.hpp"
-
-#include <functional>
 
 namespace duckdb {
 
@@ -60,6 +52,10 @@ TableFunction DeltaTableEntry::GetScanFunction(ClientContext &context, unique_pt
 	vector<LogicalType> return_types;
 	vector<string> names;
 	TableFunctionRef empty_ref;
+
+	// Propagate settings
+	param_map.insert({"pushdown_partition_info", delta_catalog.pushdown_partition_info});
+	param_map.insert({"pushdown_filters", DeltaEnumUtils::ToString(delta_catalog.filter_pushdown_mode)});
 
 	TableFunctionBindInput bind_input(inputs, param_map, return_types, names, nullptr, nullptr, delta_scan_function,
 	                                  empty_ref);

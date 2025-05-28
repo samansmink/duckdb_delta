@@ -7,7 +7,7 @@
 #include "duckdb/common/arrow/arrow_converter.hpp"
 #include "duckdb/common/arrow/arrow_appender.hpp"
 #include "duckdb/catalog/catalog_entry/view_catalog_entry.hpp"
-#include "functions/delta_scan.hpp"
+#include "functions/delta_scan/delta_scan.hpp"
 #include "storage/delta_table_entry.hpp"
 
 namespace duckdb {
@@ -193,6 +193,19 @@ DeltaTransaction &DeltaTransaction::Get(ClientContext &context, Catalog &catalog
 
 AccessMode DeltaTransaction::GetAccessMode() const {
 	return access_mode;
+}
+
+optional_ptr<DeltaTableEntry> DeltaTransaction::GetTableEntry() {
+	unique_lock<mutex> lck(lock);
+	return table_entry;
+}
+
+DeltaTableEntry &DeltaTransaction::InitializeTableEntry(ClientContext &context, DeltaSchemaEntry &schema_entry) {
+	unique_lock<mutex> lck(lock);
+	if (!table_entry) {
+		table_entry = schema_entry.CreateTableEntry(context);
+	}
+	return *table_entry;
 }
 
 } // namespace duckdb

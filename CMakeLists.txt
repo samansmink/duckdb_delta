@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.5)
 include(ExternalProject)
 
 # Core config
@@ -14,8 +14,12 @@ include_directories(src/include)
 set(EXTENSION_SOURCES
     src/delta_extension.cpp
     src/delta_functions.cpp
+    src/delta_log_types.cpp
+    src/delta_macros.cpp
     src/delta_utils.cpp
-    src/functions/delta_scan.cpp
+    src/functions/delta_scan/delta_scan.cpp
+    src/functions/delta_scan/delta_multi_file_list.cpp
+    src/functions/delta_scan/delta_multi_file_reader.cpp
     src/functions/expression_functions.cpp
     src/storage/delta_insert.cpp
     src/storage/delta_catalog.cpp
@@ -136,13 +140,12 @@ set(DELTA_KERNEL_FFI_HEADER_CXX
 # Add rust_example as a CMake target
 ExternalProject_Add(
   ${KERNEL_NAME}
-  GIT_REPOSITORY "https://github.com/zachschuermann/delta-kernel-rs"
+  GIT_REPOSITORY "https://github.com/delta-io/delta-kernel-rs"
   # WARNING: the FFI headers are currently pinned due to the C linkage issue of
   # the c++ headers. Currently, when bumping the kernel version, the produced
   # header in ./src/include/delta_kernel_ffi.hpp should be also bumped, applying
   # the fix
-  GIT_TAG append-ffi
-#    URL file:///Users/sam/Development/delta-kernel-rs
+  GIT_TAG v0.8.0
   # Prints the env variables passed to the cargo build to the terminal, useful
   # in debugging because passing them through CMake is an error-prone mess
   CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS}
@@ -152,8 +155,9 @@ ExternalProject_Add(
   # Build debug build
   BUILD_COMMAND
     ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build
-    --package delta_kernel_ffi --workspace $<$<CONFIG:Release>:--release>
-    --all-features ${RUST_PLATFORM_PARAM}
+    --package delta_kernel_ffi --workspace
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:--release> --all-features
+    ${RUST_PLATFORM_PARAM}
   # Build DATs
   COMMAND
     ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build
