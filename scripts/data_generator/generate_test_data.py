@@ -90,6 +90,17 @@ for type in ["int"]:
     query = f"CREATE table test_table as select i::{type}+10 as value1, (i)::{type}+100 as value2, (i)::{type}+1000 as value3, i::{type} as part from range(0,5) tbl(i)"
     generate_test_data_delta_rs(BASE_PATH,f"test_file_skipping_2/{type}", query, "part")
 
+## really simple
+con = duckdb.connect()
+con.query(f"COPY (SELECT i FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple.parquet'")
+generate_test_data_pyspark(BASE_PATH, 'really_simple', 'really_simple', f'{TMP_PATH}/really_simple.parquet')
+
+## really simple
+con = duckdb.connect()
+con.query(f"COPY (SELECT i, i%2 as part FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple_partitioned.parquet'")
+generate_test_data_pyspark(BASE_PATH,'really_simple_partitioned', 'really_simple_partitioned', f'{TMP_PATH}/really_simple_partitioned.parquet', partition_column='part')
+
+
 ################################################
 ### Testing specific data types
 ################################################
@@ -173,9 +184,3 @@ queries = [
     "INSERT INTO evolution_struct_field_modification_nested VALUES (named_struct('top_level_struct', named_struct('struct_field_a', 'value3', 'struct_field_b', 'value4', 'struct_field_c', 'value5')));",
 ]
 generate_test_data_pyspark_by_queries(BASE_PATH,'evolution_struct_field_modification_nested', 'evolution_struct_field_modification_nested', base_query, queries)
-
-# TODO does this work?
-## really simple
-con = duckdb.connect()
-con.query(f"COPY (SELECT i FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple.parquet'")
-generate_test_data_pyspark('really_simple', 'really_simple', f'{TMP_PATH}/really_simple.parquet')

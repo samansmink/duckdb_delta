@@ -1,4 +1,6 @@
 #include "storage/delta_transaction.hpp"
+#include "functions/delta_scan/delta_scan.hpp"
+#include "functions/delta_scan/delta_multi_file_list.hpp"
 
 #include <duckdb/main/client_data.hpp>
 
@@ -8,6 +10,7 @@
 #include "duckdb/common/arrow/arrow_appender.hpp"
 #include "duckdb/catalog/catalog_entry/view_catalog_entry.hpp"
 #include "functions/delta_scan/delta_scan.hpp"
+#include "storage/delta_insert.hpp"
 #include "storage/delta_table_entry.hpp"
 
 namespace duckdb {
@@ -126,7 +129,7 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	        auto commit_info_arrow = commit_info.ToArrow(context);
 
 	        // Convert arrow to Engine Data
-	        KernelEngineData commit_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(&commit_info_arrow, table_entry->snapshot->extern_engine.get()));
+	        KernelEngineData commit_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(commit_info_arrow.array, &commit_info_arrow.schema, table_entry->snapshot->extern_engine.get()));
 
 	        KernelExclusiveTransaction transction_with_info = ffi::with_commit_info(kernel_transaction.release(), commit_info_engine_data.release());
 
@@ -141,20 +144,24 @@ void DeltaTransaction::Commit(ClientContext &context) {
 
 	        WriteMetaData meta_data;
 	        for (const auto &file : outstanding_appends) {
-	            // TODO: how to figure out how many tuples we've written?
-	            // TODO: fix paths
 	            auto table_path = table_entry->snapshot->GetPaths()[0];
-	            auto file_without_double_slash = StringUtil::Replace(file, "\\", "/");
+	            auto file_without_double_slash = StringUtil::Replace(file.file_name, "\\", "/");
 	            // auto file_split = StringUtil::Split(file, "/");
 	            // auto file_name = file_split[file_split.size()-1];
-	            auto file_name = file.substr(table_path.size());
-	            unordered_map<string, string> partitions = {};
-	            meta_data.Append(file_name, Value::MAP(partitions), 1, Timestamp::GetCurrentTimestamp().value, true);
+	            auto file_name = file.file_name.substr(table_path.path.size());
+	            InsertionOrderPreservingMap<string> partitions = {};
+
+	            // TODO: probably horribly wrong
+	            for (const auto &part : file.partition_values) {
+	                partitions.insert({table_entry->snapshot->GetPartitionColumns()[part.partition_column_idx], part.partition_value});
+	            }
+
+	            meta_data.Append(file_name, Value::MAP(partitions), file.row_count, Timestamp::GetCurrentTimestamp().value, true);
 	        }
 
 	        auto write_metadata_ffi = meta_data.ToArrow(context);
 
-	        KernelEngineData write_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(&write_metadata_ffi, table_entry->snapshot->extern_engine.get()));
+	        KernelEngineData write_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(write_metadata_ffi.array, &write_metadata_ffi.schema, table_entry->snapshot->extern_engine.get()));
 	        ffi::add_write_metadata(transction_with_info.get(), write_info_engine_data.release());
 
 	        auto commit_res = table_entry->snapshot->TryUnpackKernelResult(ffi::commit(transction_with_info.release(), table_entry->snapshot->extern_engine.get()));
@@ -170,7 +177,7 @@ void DeltaTransaction::Rollback() {
 	}
 }
 
-void DeltaTransaction::Append(const vector<string> &append_files) {
+void DeltaTransaction::Append(const vector<DeltaDataFile> &append_files) {
     if (transaction_state == DeltaTransactionState::TRANSACTION_NOT_YET_STARTED) {
         if (access_mode == AccessMode::READ_ONLY) {
             throw InvalidInputException("Can not append to a read only table");
@@ -178,7 +185,7 @@ void DeltaTransaction::Append(const vector<string> &append_files) {
         transaction_state = DeltaTransactionState::TRANSACTION_STARTED;
 
         // Start the kernel transaction
-        string path =  table_entry->snapshot->GetPaths()[0];
+        string path =  table_entry->snapshot->GetPaths()[0].path;
         auto path_slice = KernelUtils::ToDeltaString(path);
         kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction(path_slice, table_entry->snapshot->extern_engine.get()));
     }

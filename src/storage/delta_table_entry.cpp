@@ -1,6 +1,7 @@
 #include "functions/delta_scan/delta_scan.hpp"
 #include "storage/delta_catalog.hpp"
 #include "storage/delta_table_entry.hpp"
+#include "storage/delta_transaction.hpp"
 
 #include "duckdb/storage/statistics/base_statistics.hpp"
 #include "duckdb/storage/table_storage_info.hpp"
