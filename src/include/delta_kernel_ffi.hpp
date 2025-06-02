@@ -1317,9 +1317,9 @@ NullableCvoid get_from_string_map(const CStringMap *map,
 ///
 /// # Safety
 /// Engine is responsible for providing valid pointers for each argument
-// ExternResult<KernelBoolSlice> selection_vector_from_dv(const DvInfo *dv_info,
-//                                                        Handle<SharedExternEngine> engine,
-//                                                        Handle<SharedGlobalScanState> state);
+ExternResult<KernelBoolSlice> selection_vector_from_dv(const DvInfo *dv_info,
+                                                       Handle<SharedExternEngine> engine,
+                                                       Handle<SharedGlobalScanState> state);
 
 /// Get a vector of row indexes out of a [`DvInfo`] struct
 ///

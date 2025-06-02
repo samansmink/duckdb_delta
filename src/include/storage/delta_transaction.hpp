@@ -16,6 +16,7 @@ class DeltaCatalog;
 class DeltaSchemaEntry;
 class DeltaTableEntry;
 class DeltaMultiFileList;
+struct DeltaDataFile;
 
 enum class DeltaTransactionState { TRANSACTION_NOT_YET_STARTED, TRANSACTION_STARTED, TRANSACTION_FINISHED };
 
@@ -28,7 +29,7 @@ public:
 	void Commit(ClientContext &context);
 	void Rollback();
 
-    void Append(const vector<string> &append_files);
+    void Append(const vector<DeltaDataFile> &append_files);
 
 	static DeltaTransaction &Get(ClientContext &context, Catalog &catalog);
 	AccessMode GetAccessMode() const;
@@ -37,7 +38,9 @@ public:
 	optional_ptr<DeltaTableEntry> GetTableEntry();
 	DeltaTableEntry &InitializeTableEntry(ClientContext &context, DeltaSchemaEntry &schema_entry);
 
-    vector<string> outstanding_appends;
+    vector<DeltaDataFile> outstanding_appends;
+
+    KernelExclusiveTransaction kernel_transaction;
 
 private:
 	mutex lock;

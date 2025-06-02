@@ -62,4 +62,22 @@ public:
 	InsertionOrderPreservingMap<string> ParamsToString() const override;
 };
 
+struct DeltaPartition {
+    idx_t partition_column_idx;
+    string partition_value;
+};
+
+struct DeltaDataFile {
+    DeltaDataFile() = default;
+    // DeltaDataFile(const DeltaDataFile &other);
+    // DeltaDataFile &operator=(const DeltaDataFile &);
+
+    string file_name;
+    idx_t row_count;
+    idx_t file_size_bytes;
+    idx_t footer_size;
+    optional_idx partition_id;
+    vector<DeltaPartition> partition_values;
+};
+
 } // namespace duckdb

@@ -1,0 +1,48 @@
+# name: test/sql/generated/simple_append.test
+# description: Test appending to pre-existing tables
+# group: [dat]
+
+require parquet
+
+require delta
+
+require-env GENERATED_DATA_AVAILABLE
+# 
+# statement ok
+# ATTACH 'data/generated/really_simple/delta_lake/' as dt (TYPE delta)
+# 
+# query I nosort value1
+# select sum(i)+5 from dt;
+# ----
+# 
+# statement ok
+# INSERT INTO dt VALUES (5);
+# 
+# query I nosort value1
+# select sum(i) from dt;
+# ----
+
+statement ok
+ATTACH 'data/generated/really_simple_partitioned/delta_lake/' as dt_partitioned (TYPE delta)
+
+statement ok
+INSERT INTO dt_partitioned VALUES (6, 2);
+
+mode output_result
+
+statement ok
+from dt_partitioned
+
+mode skip
+
+query I nosort value2
+select sum(i)+5, sum(part)+2 from dt_partitioned;
+----
+
+statement ok
+INSERT INTO dt_partitioned VALUES (5, 2);
+
+query I nosort value2
+select sum(i), sum(part) from dt_partitioned;
+----
+

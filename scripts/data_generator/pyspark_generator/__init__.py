@@ -43,13 +43,10 @@ def generate_test_data_pyspark(base_path, name, current_path, input_path, delete
         ## DATA GENERATION
         # df = spark.read.parquet(input_path)
         # df.write.format("delta").mode("overwrite").save(delta_table_path)
-        spark.sql(f"CREATE TABLE test_table_{name} USING delta LOCATION '{delta_table_path}' AS SELECT * FROM parquet.`{input_path}`")
-
-        ## DATA GENERATION
-        # df = spark.read.parquet(input_path)
-        # df.write.format("delta").mode("overwrite").save(delta_table_path)
         if (partition_column):
             spark.sql(f"CREATE TABLE test_table_{name} USING delta PARTITIONED BY ({partition_column}) LOCATION '{delta_table_path}' AS SELECT * FROM parquet.`{input_path}`")
+        else:
+            spark.sql(f"CREATE TABLE test_table_{name} USING delta LOCATION '{delta_table_path}' AS SELECT * FROM parquet.`{input_path}`")
 
         spark.sql(f"ALTER TABLE test_table_{name} SET TBLPROPERTIES ('delta.minReaderVersion' = '3', 'delta.minWriterVersion' = '7');")
 

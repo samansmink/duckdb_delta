@@ -93,12 +93,12 @@ for type in ["int"]:
 ## really simple
 con = duckdb.connect()
 con.query(f"COPY (SELECT i FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple.parquet'")
-generate_test_data_pyspark('really_simple', 'really_simple', f'{TMP_PATH}/really_simple.parquet')
+generate_test_data_pyspark(BASE_PATH, 'really_simple', 'really_simple', f'{TMP_PATH}/really_simple.parquet')
 
 ## really simple
 con = duckdb.connect()
 con.query(f"COPY (SELECT i, i%2 as part FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple_partitioned.parquet'")
-generate_test_data_pyspark('really_simple_partitioned', 'really_simple_partitioned', f'{TMP_PATH}/really_simple_partitioned.parquet', partition_column='part')
+generate_test_data_pyspark(BASE_PATH,'really_simple_partitioned', 'really_simple_partitioned', f'{TMP_PATH}/really_simple_partitioned.parquet', partition_column='part')
 
 
 ################################################
