@@ -202,6 +202,11 @@ AccessMode DeltaTransaction::GetAccessMode() const {
 	return access_mode;
 }
 
+bool DeltaTransaction::HasOutstandingAppends() const {
+    unique_lock<mutex> lck(lock);
+    return !outstanding_appends.empty();
+}
+
 optional_ptr<DeltaTableEntry> DeltaTransaction::GetTableEntry(idx_t version) {
 	unique_lock<mutex> lck(lock);
 

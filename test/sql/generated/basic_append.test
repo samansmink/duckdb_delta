@@ -1,0 +1,66 @@
+# name: test/sql/generated/basic_append.test
+# description: test appending to some generated tables
+
+require parquet
+
+require delta
+
+# Copy test data over to tmp test dir because we'll be inserting stuff
+statement ok
+from copy_dir('data/generated/really_simple', '__TEST_DIR__/late_materialization/really_simple');
+from copy_dir('data/generated/really_simple_partitioned', '__TEST_DIR__/late_materialization/really_simple_partitioned');
+
+statement ok
+ATTACH '__TEST_DIR__/late_materialization/really_simple/delta_lake' AS really_simple (TYPE delta);
+
+query II
+select count(*), sum(i) FROM really_simple;
+----
+10	45
+
+query II
+select count(*), sum(i) FROM read_parquet('__TEST_DIR__/late_materialization/really_simple/delta_lake/**/*.parquet', hive_partitioning=0);
+----
+10	45
+
+statement ok
+INSERT INTO really_simple VALUES (5);
+
+query II
+select count(*), sum(i) FROM really_simple;
+----
+11	50
+
+statement ok
+ATTACH '__TEST_DIR__/late_materialization/really_simple_partitioned/delta_lake' AS really_simple_partitioned (TYPE delta);
+
+query III
+select count(*), sum(i), sum(part) FROM really_simple_partitioned;
+----
+10	45	5
+
+# We write in hive_partitioned format, so this should also pick things up
+query III
+select count(*), sum(i), sum(part) FROM read_parquet('__TEST_DIR__/late_materialization/really_simple_partitioned/delta_lake/**/*.parquet', hive_partitioning=1);
+----
+10	45	5
+
+statement ok
+INSERT INTO really_simple_partitioned VALUES (5, 1);
+
+query III
+select count(*), sum(i), sum(part) FROM really_simple_partitioned;
+----
+11	50	6
+
+# We write in hive_partitioned format, so this should also pick things up
+query III
+select count(*), sum(i), sum(part) FROM read_parquet('__TEST_DIR__/late_materialization/really_simple_partitioned/delta_lake/**/*.parquet', hive_partitioning=1);
+----
+11	50	6
+
+# The files should not contain the partition values though
+query IIIIII
+DESCRIBE FROM read_parquet('__TEST_DIR__/late_materialization/really_simple_partitioned/delta_lake/**/*.parquet', hive_partitioning=0);
+----
+i	BIGINT	YES	NULL	NULL	NULL

@@ -143,16 +143,13 @@ static DeltaColumnStats ParseColumnStats(const vector<Value> col_stats) {
     return column_stats;
 }
 
-static void AddWrittenFiles(DeltaInsertGlobalState &global_state, DataChunk &chunk, optional_idx partition_id) {
+static void AddWrittenFiles(DeltaInsertGlobalState &global_state, DataChunk &chunk) {
 	for (idx_t r = 0; r < chunk.size(); r++) {
 		DeltaDataFile data_file;
 		data_file.file_name = chunk.GetValue(0, r).GetValue<string>();
 		data_file.row_count = chunk.GetValue(1, r).GetValue<idx_t>();
 		data_file.file_size_bytes = chunk.GetValue(2, r).GetValue<idx_t>();
 		data_file.footer_size = chunk.GetValue(3, r).GetValue<idx_t>();
-		if (partition_id.IsValid()) {
-			data_file.partition_id = partition_id.GetIndex();
-		}
 		// extract the column stats
 		auto column_stats = chunk.GetValue(4, r);
 		auto &map_children = MapValue::GetChildren(column_stats);
@@ -193,8 +190,7 @@ SinkResultType DeltaInsert::Sink(ExecutionContext &context, DataChunk &chunk, Op
         throw InternalException("DeltaInsert::Sink expects a single row containing output of the PhysicalCopy that should be its Source");
     }
 
-    // TODO: pass through the partition id?
-    AddWrittenFiles(global_state, chunk, {});
+    AddWrittenFiles(global_state, chunk);
 
     return SinkResultType::NEED_MORE_INPUT;
 }
@@ -261,7 +257,7 @@ PhysicalOperator &DeltaCatalog::PlanInsert(ClientContext &context, PhysicalPlanG
 		throw BinderException("ON CONFLICT clause not yet supported for insertion into Delta table");
 	}
 
-    string delta_path =  op.table.Cast<DeltaTableEntry>().snapshot->GetPaths()[0].path; // TODO unsafe?
+    string delta_path =  op.table.Cast<DeltaTableEntry>().snapshot->GetPaths()[0].path;
 
     // Create Copy Info
     auto info = make_uniq<CopyInfo>();
@@ -277,9 +273,8 @@ PhysicalOperator &DeltaCatalog::PlanInsert(ClientContext &context, PhysicalPlanG
 
     auto partitions = op.table.Cast<DeltaTableEntry>().snapshot->GetPartitionColumns();
     vector<idx_t> partition_columns;
-    if (partitions.size() != 0) {
+    if (!partitions.empty()) {
         auto column_names = op.table.Cast<DeltaTableEntry>().GetColumns().GetColumnNames();
-        // TODO: yuck?
         for (int64_t i = 0; i < partitions.size(); i++) {
             for (int64_t j = 0; j < column_names.size(); j++) {
                 if (column_names[j] == partitions[i]) {
@@ -293,9 +288,6 @@ PhysicalOperator &DeltaCatalog::PlanInsert(ClientContext &context, PhysicalPlanG
     // Bind Copy Function
     auto &columns = op.table.Cast<DeltaTableEntry>().GetColumns();
     CopyFunctionBindInput bind_input(*info);
-
-    // auto names_to_write = LogicalCopyToFile::GetNamesWithoutPartitions(columns.GetColumnNames(), partition_columns, false);
-    // auto types_to_write = LogicalCopyToFile::GetTypesWithoutPartitions(columns.GetColumnTypes(), partition_columns, false);
 
     auto names_to_write = columns.GetColumnNames();
     auto types_to_write = columns.GetColumnTypes();
@@ -326,8 +318,8 @@ PhysicalOperator &DeltaCatalog::PlanInsert(ClientContext &context, PhysicalPlanG
     physical_copy_ref.overwrite_mode = CopyOverwriteMode::COPY_OVERWRITE_OR_IGNORE;
     physical_copy_ref.per_thread_output = false;
     physical_copy_ref.rotate = false;
-    physical_copy_ref.return_type = CopyFunctionReturnType::WRITTEN_FILE_STATISTICS; // TODO: capture stats
-    physical_copy_ref.write_partition_columns = true; // TODO this is wrong! we don't write partition in delta
+    physical_copy_ref.return_type = CopyFunctionReturnType::WRITTEN_FILE_STATISTICS;
+    physical_copy_ref.write_partition_columns = true;
     physical_copy_ref.children.push_back(*plan);
     physical_copy_ref.names = names_to_write;
     physical_copy_ref.expected_types = types_to_write;

@@ -34,27 +34,28 @@ public:
 	static DeltaTransaction &Get(ClientContext &context, Catalog &catalog);
 	AccessMode GetAccessMode() const;
 
-public:
+    bool HasOutstandingAppends() const;
+
 	optional_ptr<DeltaTableEntry> GetTableEntry(idx_t version);
+
 	DeltaTableEntry &InitializeTableEntry(ClientContext &context, DeltaSchemaEntry &schema_entry);
 
-    vector<DeltaDataFile> outstanding_appends;
-
-    KernelExclusiveTransaction kernel_transaction;
-
 private:
-	mutex lock;
+	mutable mutex lock;
 
     //! Cached table entry (without a specified version)
     unique_ptr<DeltaTableEntry> table_entry;
     //! Cached table entries at specific versions
     unordered_map<idx_t, unique_ptr<DeltaTableEntry>> versioned_table_entries;
 
-    vector<string> outstanding_appends;
-
 	//	DeltaConnection connection;
 	DeltaTransactionState transaction_state;
-	AccessMode access_mode;
+
+    const AccessMode access_mode;
+
+    vector<DeltaDataFile> outstanding_appends;
+
+    KernelExclusiveTransaction kernel_transaction;
 };
 
 } // namespace duckdb

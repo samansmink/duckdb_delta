@@ -76,7 +76,6 @@ struct DeltaDataFile {
     idx_t row_count;
     idx_t file_size_bytes;
     idx_t footer_size;
-    optional_idx partition_id;
     vector<DeltaPartition> partition_values;
 };
 
