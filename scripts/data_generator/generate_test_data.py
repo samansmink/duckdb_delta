@@ -111,10 +111,19 @@ con = duckdb.connect()
 con.query(f"COPY (SELECT i FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple.parquet'")
 generate_test_data_pyspark(BASE_PATH, 'really_simple', 'really_simple', f'{TMP_PATH}/really_simple.parquet')
 
-## really simple
+## really simple partitioned
 con = duckdb.connect()
 con.query(f"COPY (SELECT i, i%2 as part FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple_partitioned.parquet'")
 generate_test_data_pyspark(BASE_PATH,'really_simple_partitioned', 'really_simple_partitioned', f'{TMP_PATH}/really_simple_partitioned.parquet', partition_column='part')
+
+## really simple column mapped
+## Table with simple evolution: adding a column
+base_query = 'SELECT i, i%2 as part FROM range(0,9) tbl(i);'
+queries = [
+    'ALTER TABLE really_simple_column_mapped ADD COLUMN new_col BIGINT;',
+    'INSERT INTO really_simple_column_mapped VALUES (9, 1, 1337);'
+]
+generate_test_data_pyspark_by_queries(BASE_PATH,'really_simple_column_mapped', 'really_simple_column_mapped', base_query, queries)
 
 
 ################################################

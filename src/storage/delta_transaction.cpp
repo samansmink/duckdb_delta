@@ -1,4 +1,5 @@
 #include "storage/delta_transaction.hpp"
+
 #include "functions/delta_scan/delta_scan.hpp"
 #include "functions/delta_scan/delta_multi_file_list.hpp"
 
@@ -54,7 +55,7 @@ struct CommitInfo {
         buffer.SetCardinality(current_size+1);
     }
 
-    ffi::ArrowFFIData ToArrow(ClientContext &context) {
+    ffi::ArrowFFIData ToArrow(optional_ptr<ClientContext> context) {
         ffi::ArrowFFIData ffi_data;
         unordered_map<idx_t, const shared_ptr<ArrowTypeExtensionData>> extension_types;
         ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, context);
@@ -118,23 +119,22 @@ struct WriteMetaData {
     DataChunk buffer;
 };
 
+unique_ptr<SchemaVisitor::FieldList> DeltaTransaction::GetWriteSchema(ClientContext &context) {
+    if (transaction_state == DeltaTransactionState::TRANSACTION_NOT_YET_STARTED) {
+        InitializeTransaction(context);
+    }
+
+    auto write_context = ffi::get_write_context(kernel_transaction.get());
+    auto result = SchemaVisitor::VisitWriteContextSchema(write_context);
+    return result;
+}
+
 void DeltaTransaction::Commit(ClientContext &context) {
 	if (transaction_state == DeltaTransactionState::TRANSACTION_STARTED) {
 		transaction_state = DeltaTransactionState::TRANSACTION_FINISHED;
 
 	    if (!outstanding_appends.empty()) {
-	        // Create commit info
-	        CommitInfo commit_info;
-	        commit_info.Append(Value::MAP(LogicalType::VARCHAR, LogicalType::VARCHAR, {Value("engineInfo")}, {Value("DuckDB")}));
-	        auto commit_info_arrow = commit_info.ToArrow(context);
-
-	        // Convert arrow to Engine Data
-	        KernelEngineData commit_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(commit_info_arrow.array, &commit_info_arrow.schema, table_entry->snapshot->extern_engine.get()));
-
-	        KernelExclusiveTransaction transction_with_info = ffi::with_commit_info(kernel_transaction.release(), commit_info_engine_data.release());
-
-	        auto write_context = ffi::get_write_context(transction_with_info.get());
-	        auto write_schema = ffi::get_write_schema(write_context);
+	        auto write_context = ffi::get_write_context(kernel_transaction.get());
 	        auto write_path = ffi::get_write_path(write_context, allocate_string);
 	        string write_path_string;
 	        if (write_path) {
@@ -162,9 +162,9 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	        auto write_metadata_ffi = meta_data.ToArrow(context);
 
 	        KernelEngineData write_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(write_metadata_ffi.array, &write_metadata_ffi.schema, table_entry->snapshot->extern_engine.get()));
-	        ffi::add_write_metadata(transction_with_info.get(), write_info_engine_data.release());
+	        ffi::add_write_metadata(kernel_transaction.get(), write_info_engine_data.release());
 
-	        auto commit_res = table_entry->snapshot->TryUnpackKernelResult(ffi::commit(transction_with_info.release(), table_entry->snapshot->extern_engine.get()));
+	        auto commit_res = table_entry->snapshot->TryUnpackKernelResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()));
 	    }
 	}
 }
@@ -177,17 +177,31 @@ void DeltaTransaction::Rollback() {
 	}
 }
 
-void DeltaTransaction::Append(const vector<DeltaDataFile> &append_files) {
-    if (transaction_state == DeltaTransactionState::TRANSACTION_NOT_YET_STARTED) {
-        if (access_mode == AccessMode::READ_ONLY) {
-            throw InvalidInputException("Can not append to a read only table");
-        }
-        transaction_state = DeltaTransactionState::TRANSACTION_STARTED;
+void DeltaTransaction::InitializeTransaction(ClientContext &context) {
+    if (access_mode == AccessMode::READ_ONLY) {
+        throw InvalidInputException("Can not append to a read only table");
+    }
+    transaction_state = DeltaTransactionState::TRANSACTION_STARTED;
 
-        // Start the kernel transaction
-        string path =  table_entry->snapshot->GetPaths()[0].path;
-        auto path_slice = KernelUtils::ToDeltaString(path);
-        kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction(path_slice, table_entry->snapshot->extern_engine.get()));
+    // Start the kernel transaction
+    string path =  table_entry->snapshot->GetPaths()[0].path;
+    auto path_slice = KernelUtils::ToDeltaString(path);
+    auto new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction(path_slice, table_entry->snapshot->extern_engine.get()));
+
+    // Create commit info
+    CommitInfo commit_info;
+    commit_info.Append(Value::MAP(LogicalType::VARCHAR, LogicalType::VARCHAR, {Value("engineInfo")}, {Value("DuckDB")}));
+    auto commit_info_arrow = commit_info.ToArrow(context);
+
+    // Convert arrow to Engine Data
+    KernelEngineData commit_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(commit_info_arrow.array, &commit_info_arrow.schema, table_entry->snapshot->extern_engine.get()));
+
+    kernel_transaction = ffi::with_commit_info(new_kernel_transaction, commit_info_engine_data.release());
+}
+
+void DeltaTransaction::Append(ClientContext &context, const vector<DeltaDataFile> &append_files) {
+    if (transaction_state == DeltaTransactionState::TRANSACTION_NOT_YET_STARTED) {
+        InitializeTransaction(context);
     }
 
     // Append the newly inserted data

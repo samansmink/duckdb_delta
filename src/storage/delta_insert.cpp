@@ -214,7 +214,7 @@ SinkFinalizeType DeltaInsert::Finalize(Pipeline &pipeline, Event &event, ClientC
 
     auto &transaction = DeltaTransaction::Get(context, table->catalog);
     vector<string> filenames;
-    transaction.Append(global_state.written_files);
+    transaction.Append(context, global_state.written_files);
 
     return SinkFinalizeType::READY;
 }
@@ -270,6 +270,7 @@ PhysicalOperator &DeltaCatalog::PlanInsert(ClientContext &context, PhysicalPlanG
     if (!copy_fun) {
         throw MissingExtensionException("Did not find parquet copy function required to write to delta table");
     }
+
 
     auto partitions = op.table.Cast<DeltaTableEntry>().snapshot->GetPartitionColumns();
     vector<idx_t> partition_columns;

@@ -13,6 +13,7 @@
 #include "duckdb/parser/expression/comparison_expression.hpp"
 #include "duckdb/parser/expression/function_expression.hpp"
 #include "duckdb/parser/expression/operator_expression.hpp"
+#include "include/delta_kernel_ffi.hpp"
 
 namespace duckdb {
 
@@ -528,6 +529,20 @@ unique_ptr<SchemaVisitor::FieldList> SchemaVisitor::VisitSnapshotGlobalReadSchem
 		schema = ffi::scan_physical_schema(scan);
 	}
 
+	uintptr_t result = visit_schema(schema, &visitor);
+	free_schema(schema);
+
+	if (visitor_state.error.HasError()) {
+		visitor_state.error.Throw();
+	}
+
+	return visitor_state.TakeFieldList(result);
+}
+
+unique_ptr<SchemaVisitor::FieldList> SchemaVisitor::VisitWriteContextSchema(ffi::SharedWriteContext *write_context) {
+	SchemaVisitor visitor_state;
+	auto visitor = CreateSchemaVisitor(visitor_state);
+    auto schema = ffi::get_write_schema(write_context);
 	uintptr_t result = visit_schema(schema, &visitor);
 	free_schema(schema);
 

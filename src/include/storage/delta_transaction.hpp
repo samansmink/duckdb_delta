@@ -17,6 +17,7 @@ class DeltaSchemaEntry;
 class DeltaTableEntry;
 class DeltaMultiFileList;
 struct DeltaDataFile;
+struct MultiFileColumnDefinition;
 
 enum class DeltaTransactionState { TRANSACTION_NOT_YET_STARTED, TRANSACTION_STARTED, TRANSACTION_FINISHED };
 
@@ -29,7 +30,7 @@ public:
 	void Commit(ClientContext &context);
 	void Rollback();
 
-    void Append(const vector<DeltaDataFile> &append_files);
+    void Append(ClientContext &context, const vector<DeltaDataFile> &append_files);
 
 	static DeltaTransaction &Get(ClientContext &context, Catalog &catalog);
 	AccessMode GetAccessMode() const;
@@ -39,6 +40,10 @@ public:
 	optional_ptr<DeltaTableEntry> GetTableEntry(idx_t version);
 
 	DeltaTableEntry &InitializeTableEntry(ClientContext &context, DeltaSchemaEntry &schema_entry);
+    unique_ptr<SchemaVisitor::FieldList> GetWriteSchema(ClientContext &context);
+
+protected:
+    void InitializeTransaction(ClientContext &context);
 
 private:
 	mutable mutex lock;

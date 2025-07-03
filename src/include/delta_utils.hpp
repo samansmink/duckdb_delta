@@ -152,6 +152,7 @@ public:
 
 	static unique_ptr<FieldList> VisitSnapshotSchema(ffi::SharedSnapshot *snapshot);
 	static unique_ptr<FieldList> VisitSnapshotGlobalReadSchema(ffi::SharedScan *state, bool logical);
+	static unique_ptr<FieldList> VisitWriteContextSchema(ffi::SharedWriteContext *write_context);
 
 private:
 	unordered_map<uintptr_t, unique_ptr<FieldList>> inflight_lists;
