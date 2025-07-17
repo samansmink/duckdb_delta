@@ -1,0 +1,22 @@
+# name: test/sql/dat/attach.test
+# description: Test attaching a delta table
+# group: [dat]
+
+require parquet
+
+require delta
+
+require-env DAT_PATH
+
+statement ok
+ATTACH '${DAT_PATH}/out/reader_tests/generated/all_primitive_types/delta' as dt (TYPE delta)
+
+# We can query the table by the catalog name
+query I
+select utf8 from dt.dt at (version => 1)
+----
+0
+1
+2
+3
+4

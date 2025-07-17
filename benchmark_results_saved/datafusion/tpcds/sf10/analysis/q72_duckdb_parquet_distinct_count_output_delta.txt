@@ -1,0 +1,20 @@
+Following columns have the same distinct count:
+ TOTAL DOMAIN = 11796480
+Following columns have the same distinct count:
+ TOTAL DOMAIN = 2580480
+Following columns have the same distinct count:
+ TOTAL DOMAIN = 102000
+Following columns have the same distinct count:
+ TOTAL DOMAIN = 73049
+Following columns have the same distinct count:
+ TOTAL DOMAIN = 73049
+Following columns have the same distinct count:
+ TOTAL DOMAIN = 73049
+Following columns have the same distinct count:
+ TOTAL DOMAIN = 73049
+Following columns have the same distinct count:
+ TOTAL DOMAIN = 73049
+Following columns have the same distinct count:
+ TOTAL DOMAIN = 7200
+Following columns have the same distinct count:
+ TOTAL DOMAIN = 10

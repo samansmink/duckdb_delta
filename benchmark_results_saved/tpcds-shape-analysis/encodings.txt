@@ -1,0 +1,27 @@
+# Encoding differences
+## PySpark (both Parquet table and Delta Table)
+┌──────────────────────────────────────────┐
+│                encodings                 │
+│                 varchar                  │
+├──────────────────────────────────────────┤
+│ PLAIN_DICTIONARY, RLE, PLAIN, BIT_PACKED │
+│ PLAIN_DICTIONARY, RLE, BIT_PACKED        │
+│ RLE, PLAIN, BIT_PACKED                   │
+└──────────────────────────────────────────┘
+
+## DuckDB generated parquet
+┌───────────────────────┐
+│       encodings       │
+│        varchar        │
+├───────────────────────┤
+│ PLAIN                 │
+│ PLAIN, RLE_DICTIONARY │
+└───────────────────────┘
+
+## DeltaRS Delta Lake
+┌────────────────────────────┐
+│         encodings          │
+│          varchar           │
+├────────────────────────────┤
+│ PLAIN, RLE, RLE_DICTIONARY │
+└────────────────────────────┘

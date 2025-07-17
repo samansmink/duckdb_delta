@@ -1,0 +1,604 @@
+D DESCRIBE FROM call_center;
+┌───────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│    column_name    │ column_type  │  null   │   key   │ default │  extra  │
+│      varchar      │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├───────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ cc_call_center_sk │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_call_center_id │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_rec_start_date │ DATE         │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_rec_end_date   │ DATE         │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_closed_date_sk │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_open_date_sk   │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_name           │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_class          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_employees      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_sq_ft          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_hours          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_manager        │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_mkt_id         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_mkt_class      │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_mkt_desc       │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_market_manager │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_division       │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_division_name  │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_company        │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_company_name   │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_street_number  │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_street_name    │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_street_type    │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_suite_number   │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_city           │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_county         │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_state          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_zip            │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_country        │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_gmt_offset     │ DECIMAL(5,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cc_tax_percentage │ DECIMAL(5,2) │ YES     │ NULL    │ NULL    │ NULL    │
+├───────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 31 rows                                                        6 columns │
+└──────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM catalog_page;
+┌────────────────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│      column_name       │ column_type │  null   │   key   │ default │  extra  │
+│        varchar         │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├────────────────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ cp_catalog_page_sk     │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cp_catalog_page_id     │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cp_start_date_sk       │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cp_end_date_sk         │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cp_department          │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cp_catalog_number      │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cp_catalog_page_number │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cp_description         │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cp_type                │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+└────────────────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┘
+D DESCRIBE FROM catalog_returns;
+┌──────────────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│       column_name        │ column_type  │  null   │   key   │ default │  extra  │
+│         varchar          │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├──────────────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ cr_returned_date_sk      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_returned_time_sk      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_item_sk               │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_refunded_customer_sk  │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_refunded_cdemo_sk     │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_refunded_hdemo_sk     │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_refunded_addr_sk      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_returning_customer_sk │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_returning_cdemo_sk    │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_returning_hdemo_sk    │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_returning_addr_sk     │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_call_center_sk        │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_catalog_page_sk       │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_ship_mode_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_warehouse_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_reason_sk             │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_order_number          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_return_quantity       │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_return_amount         │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_return_tax            │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_return_amt_inc_tax    │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_fee                   │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_return_ship_cost      │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_refunded_cash         │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_reversed_charge       │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_store_credit          │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cr_net_loss              │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+├──────────────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 27 rows                                                               6 columns │
+└─────────────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM catalog_sales;
+┌──────────────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│       column_name        │ column_type  │  null   │   key   │ default │  extra  │
+│         varchar          │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├──────────────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ cs_sold_date_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_sold_time_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ship_date_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_bill_customer_sk      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_bill_cdemo_sk         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_bill_hdemo_sk         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_bill_addr_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ship_customer_sk      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ship_cdemo_sk         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ship_hdemo_sk         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ship_addr_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_call_center_sk        │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_catalog_page_sk       │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ship_mode_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_warehouse_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_item_sk               │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_promo_sk              │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_order_number          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_quantity              │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_wholesale_cost        │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_list_price            │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_sales_price           │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ext_discount_amt      │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ext_sales_price       │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ext_wholesale_cost    │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ext_list_price        │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ext_tax               │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_coupon_amt            │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_ext_ship_cost         │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_net_paid              │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_net_paid_inc_tax      │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_net_paid_inc_ship     │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_net_paid_inc_ship_tax │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ cs_net_profit            │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+├──────────────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 34 rows                                                               6 columns │
+└─────────────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM customer;
+┌────────────────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│      column_name       │ column_type │  null   │   key   │ default │  extra  │
+│        varchar         │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├────────────────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ c_customer_sk          │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_customer_id          │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_current_cdemo_sk     │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_current_hdemo_sk     │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_current_addr_sk      │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_first_shipto_date_sk │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_first_sales_date_sk  │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_salutation           │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_first_name           │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_last_name            │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_preferred_cust_flag  │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_birth_day            │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_birth_month          │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_birth_year           │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_birth_country        │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_login                │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_email_address        │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ c_last_review_date_sk  │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+├────────────────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 18 rows                                                            6 columns │
+└──────────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM customer_demographics;
+┌───────────────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│      column_name      │ column_type │  null   │   key   │ default │  extra  │
+│        varchar        │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├───────────────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ cd_demo_sk            │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cd_gender             │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cd_marital_status     │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cd_education_status   │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cd_purchase_estimate  │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cd_credit_rating      │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cd_dep_count          │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cd_dep_employed_count │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ cd_dep_college_count  │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+└───────────────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┘
+D DESCRIBE FROM customer_address;
+┌──────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│   column_name    │ column_type  │  null   │   key   │ default │  extra  │
+│     varchar      │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├──────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ ca_address_sk    │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_address_id    │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_street_number │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_street_name   │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_street_type   │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_suite_number  │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_city          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_county        │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_state         │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_zip           │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_country       │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_gmt_offset    │ DECIMAL(5,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ca_location_type │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+├──────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 13 rows                                                       6 columns │
+└─────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM date_dim;
+┌─────────────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│     column_name     │ column_type │  null   │   key   │ default │  extra  │
+│       varchar       │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├─────────────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ d_date_sk           │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_date_id           │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_date              │ DATE        │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_month_seq         │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_week_seq          │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_quarter_seq       │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_year              │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_dow               │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_moy               │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_dom               │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_qoy               │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_fy_year           │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_fy_quarter_seq    │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_fy_week_seq       │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_day_name          │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_quarter_name      │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_holiday           │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_weekend           │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_following_holiday │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_first_dom         │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_last_dom          │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_same_day_ly       │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_same_day_lq       │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_current_day       │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_current_week      │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_current_month     │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_current_quarter   │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ d_current_year      │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+├─────────────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 28 rows                                                         6 columns │
+└───────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM household_demographics;
+┌───────────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│    column_name    │ column_type │  null   │   key   │ default │  extra  │
+│      varchar      │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├───────────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ hd_demo_sk        │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ hd_income_band_sk │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ hd_buy_potential  │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ hd_dep_count      │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ hd_vehicle_count  │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+└───────────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┘
+D DESCRIBE FROM inventory;
+┌──────────────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│     column_name      │ column_type │  null   │   key   │ default │  extra  │
+│       varchar        │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├──────────────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ inv_date_sk          │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ inv_item_sk          │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ inv_warehouse_sk     │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ inv_quantity_on_hand │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+└──────────────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┘
+D DESCRIBE FROM income_band;
+┌───────────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│    column_name    │ column_type │  null   │   key   │ default │  extra  │
+│      varchar      │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├───────────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ ib_income_band_sk │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ ib_lower_bound    │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ ib_upper_bound    │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+└───────────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┘
+D DESCRIBE FROM item;
+┌──────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│   column_name    │ column_type  │  null   │   key   │ default │  extra  │
+│     varchar      │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├──────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ i_item_sk        │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_item_id        │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_rec_start_date │ DATE         │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_rec_end_date   │ DATE         │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_item_desc      │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_current_price  │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_wholesale_cost │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_brand_id       │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_brand          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_class_id       │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_class          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_category_id    │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_category       │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_manufact_id    │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_manufact       │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_size           │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_formulation    │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_color          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_units          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_container      │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_manager_id     │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ i_product_name   │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+├──────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 22 rows                                                       6 columns │
+└─────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM promotion;
+┌───────────────────┬───────────────┬─────────┬─────────┬─────────┬─────────┐
+│    column_name    │  column_type  │  null   │   key   │ default │  extra  │
+│      varchar      │    varchar    │ varchar │ varchar │ varchar │ varchar │
+├───────────────────┼───────────────┼─────────┼─────────┼─────────┼─────────┤
+│ p_promo_sk        │ INTEGER       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_promo_id        │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_start_date_sk   │ INTEGER       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_end_date_sk     │ INTEGER       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_item_sk         │ INTEGER       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_cost            │ DECIMAL(15,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_response_target │ INTEGER       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_promo_name      │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_channel_dmail   │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_channel_email   │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_channel_catalog │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_channel_tv      │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_channel_radio   │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_channel_press   │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_channel_event   │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_channel_demo    │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_channel_details │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_purpose         │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+│ p_discount_active │ VARCHAR       │ YES     │ NULL    │ NULL    │ NULL    │
+├───────────────────┴───────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 19 rows                                                         6 columns │
+└───────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM reason;
+┌───────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│  column_name  │ column_type │  null   │   key   │ default │  extra  │
+│    varchar    │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├───────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ r_reason_sk   │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ r_reason_id   │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ r_reason_desc │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+└───────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┘
+D DESCRIBE FROM ship_mode;
+┌─────────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│   column_name   │ column_type │  null   │   key   │ default │  extra  │
+│     varchar     │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├─────────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ sm_ship_mode_sk │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ sm_ship_mode_id │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ sm_type         │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ sm_code         │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ sm_carrier      │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ sm_contract     │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+└─────────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┘
+D DESCRIBE FROM store;
+┌────────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│    column_name     │ column_type  │  null   │   key   │ default │  extra  │
+│      varchar       │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├────────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ s_store_sk         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_store_id         │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_rec_start_date   │ DATE         │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_rec_end_date     │ DATE         │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_closed_date_sk   │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_store_name       │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_number_employees │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_floor_space      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_hours            │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_manager          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_market_id        │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_geography_class  │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_market_desc      │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_market_manager   │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_division_id      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_division_name    │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_company_id       │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_company_name     │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_street_number    │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_street_name      │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_street_type      │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_suite_number     │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_city             │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_county           │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_state            │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_zip              │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_country          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_gmt_offset       │ DECIMAL(5,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ s_tax_percentage   │ DECIMAL(5,2) │ YES     │ NULL    │ NULL    │ NULL    │
+├────────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 29 rows                                                         6 columns │
+└───────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM store_returns;
+┌───────────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│      column_name      │ column_type  │  null   │   key   │ default │  extra  │
+│        varchar        │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├───────────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ sr_returned_date_sk   │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_return_time_sk     │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_item_sk            │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_customer_sk        │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_cdemo_sk           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_hdemo_sk           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_addr_sk            │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_store_sk           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_reason_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_ticket_number      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_return_quantity    │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_return_amt         │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_return_tax         │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_return_amt_inc_tax │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_fee                │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_return_ship_cost   │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_refunded_cash      │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_reversed_charge    │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_store_credit       │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ sr_net_loss           │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+├───────────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 20 rows                                                            6 columns │
+└──────────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM store_sales;
+┌───────────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│      column_name      │ column_type  │  null   │   key   │ default │  extra  │
+│        varchar        │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├───────────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ ss_sold_date_sk       │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_sold_time_sk       │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_item_sk            │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_customer_sk        │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_cdemo_sk           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_hdemo_sk           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_addr_sk            │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_store_sk           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_promo_sk           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_ticket_number      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_quantity           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_wholesale_cost     │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_list_price         │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_sales_price        │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_ext_discount_amt   │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_ext_sales_price    │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_ext_wholesale_cost │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_ext_list_price     │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_ext_tax            │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_coupon_amt         │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_net_paid           │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_net_paid_inc_tax   │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ss_net_profit         │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+├───────────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 23 rows                                                            6 columns │
+└──────────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM time_dim;
+┌─────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│ column_name │ column_type │  null   │   key   │ default │  extra  │
+│   varchar   │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├─────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ t_time_sk   │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ t_time_id   │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ t_time      │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ t_hour      │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ t_minute    │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ t_second    │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ t_am_pm     │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ t_shift     │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ t_sub_shift │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ t_meal_time │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+├─────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 10 rows                                                 6 columns │
+└───────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM warehouse;
+┌───────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│    column_name    │ column_type  │  null   │   key   │ default │  extra  │
+│      varchar      │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├───────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ w_warehouse_sk    │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_warehouse_id    │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_warehouse_name  │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_warehouse_sq_ft │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_street_number   │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_street_name     │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_street_type     │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_suite_number    │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_city            │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_county          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_state           │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_zip             │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_country         │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ w_gmt_offset      │ DECIMAL(5,2) │ YES     │ NULL    │ NULL    │ NULL    │
+├───────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 14 rows                                                        6 columns │
+└──────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM web_page;
+┌─────────────────────┬─────────────┬─────────┬─────────┬─────────┬─────────┐
+│     column_name     │ column_type │  null   │   key   │ default │  extra  │
+│       varchar       │   varchar   │ varchar │ varchar │ varchar │ varchar │
+├─────────────────────┼─────────────┼─────────┼─────────┼─────────┼─────────┤
+│ wp_web_page_sk      │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_web_page_id      │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_rec_start_date   │ DATE        │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_rec_end_date     │ DATE        │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_creation_date_sk │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_access_date_sk   │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_autogen_flag     │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_customer_sk      │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_url              │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_type             │ VARCHAR     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_char_count       │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_link_count       │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_image_count      │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+│ wp_max_ad_count     │ INTEGER     │ YES     │ NULL    │ NULL    │ NULL    │
+├─────────────────────┴─────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 14 rows                                                         6 columns │
+└───────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM web_returns;
+┌──────────────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│       column_name        │ column_type  │  null   │   key   │ default │  extra  │
+│         varchar          │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├──────────────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ wr_returned_date_sk      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_returned_time_sk      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_item_sk               │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_refunded_customer_sk  │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_refunded_cdemo_sk     │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_refunded_hdemo_sk     │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_refunded_addr_sk      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_returning_customer_sk │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_returning_cdemo_sk    │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_returning_hdemo_sk    │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_returning_addr_sk     │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_web_page_sk           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_reason_sk             │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_order_number          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_return_quantity       │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_return_amt            │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_return_tax            │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_return_amt_inc_tax    │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_fee                   │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_return_ship_cost      │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_refunded_cash         │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_reversed_charge       │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_account_credit        │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ wr_net_loss              │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+├──────────────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 24 rows                                                               6 columns │
+└─────────────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM web_sales;
+┌──────────────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│       column_name        │ column_type  │  null   │   key   │ default │  extra  │
+│         varchar          │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├──────────────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ ws_sold_date_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_sold_time_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ship_date_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_item_sk               │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_bill_customer_sk      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_bill_cdemo_sk         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_bill_hdemo_sk         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_bill_addr_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ship_customer_sk      │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ship_cdemo_sk         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ship_hdemo_sk         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ship_addr_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_web_page_sk           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_web_site_sk           │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ship_mode_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_warehouse_sk          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_promo_sk              │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_order_number          │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_quantity              │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_wholesale_cost        │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_list_price            │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_sales_price           │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ext_discount_amt      │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ext_sales_price       │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ext_wholesale_cost    │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ext_list_price        │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ext_tax               │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_coupon_amt            │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_ext_ship_cost         │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_net_paid              │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_net_paid_inc_tax      │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_net_paid_inc_ship     │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_net_paid_inc_ship_tax │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ ws_net_profit            │ DECIMAL(7,2) │ YES     │ NULL    │ NULL    │ NULL    │
+├──────────────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 34 rows                                                               6 columns │
+└─────────────────────────────────────────────────────────────────────────────────┘
+D DESCRIBE FROM web_site;
+┌────────────────────┬──────────────┬─────────┬─────────┬─────────┬─────────┐
+│    column_name     │ column_type  │  null   │   key   │ default │  extra  │
+│      varchar       │   varchar    │ varchar │ varchar │ varchar │ varchar │
+├────────────────────┼──────────────┼─────────┼─────────┼─────────┼─────────┤
+│ web_site_sk        │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_site_id        │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_rec_start_date │ DATE         │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_rec_end_date   │ DATE         │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_name           │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_open_date_sk   │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_close_date_sk  │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_class          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_manager        │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_mkt_id         │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_mkt_class      │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_mkt_desc       │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_market_manager │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_company_id     │ INTEGER      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_company_name   │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_street_number  │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_street_name    │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_street_type    │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_suite_number   │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_city           │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_county         │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_state          │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_zip            │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_country        │ VARCHAR      │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_gmt_offset     │ DECIMAL(5,2) │ YES     │ NULL    │ NULL    │ NULL    │
+│ web_tax_percentage │ DECIMAL(5,2) │ YES     │ NULL    │ NULL    │ NULL    │
+├────────────────────┴──────────────┴─────────┴─────────┴─────────┴─────────┤
+│ 26 rows                                                         6 columns │
+└───────────────────────────────────────────────────────────────────────────┘
+D 

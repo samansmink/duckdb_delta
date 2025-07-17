@@ -1,0 +1,67 @@
+# Analysis of liquid clusterin dataset
+
+## TPC-DS sf100 Liquid clustering (databricks provided)
+┌────────────────────────┬────────────┬─────────────────┬────────────┬──────────────────┬─────────────────┬───────────────────┐
+│       table_name       │ file_count │ row_group_count │ total_rows │ total_rows_check │ compressed_size │ uncompressed_size │
+│        varchar         │   int64    │      int64      │   int128   │      int128      │     varchar     │      varchar      │
+├────────────────────────┼────────────┼─────────────────┼────────────┼──────────────────┼─────────────────┼───────────────────┤
+│ inventory              │         25 │              25 │  399330000 │        399330000 │ 1.1 GiB         │ 1.2 GiB           │
+│ store_sales            │        251 │             251 │  288006388 │        288006388 │ 15.8 GiB        │ 17.7 GiB          │
+│ catalog_sales          │        161 │             161 │  143994124 │        143994124 │ 11.9 GiB        │ 12.8 GiB          │
+│ web_sales              │         77 │              77 │   72001613 │         72001613 │ 5.7 GiB         │ 6.5 GiB           │
+│ store_returns          │         24 │              24 │   28801611 │         28801611 │ 1.3 GiB         │ 1.4 GiB           │
+│ catalog_returns        │         15 │              15 │   14397822 │         14397822 │ 949.8 MiB       │ 1022.5 MiB        │
+│ web_returns            │          7 │               7 │    7199389 │          7199389 │ 459.9 MiB       │ 494.9 MiB         │
+│ customer               │          2 │               2 │    2000000 │          2000000 │ 101.4 MiB       │ 144.6 MiB         │
+│ customer_demographics  │          1 │               1 │    1920800 │          1920800 │ 7.3 MiB         │ 8.7 MiB           │
+│ customer_address       │          1 │               1 │    1000000 │          1000000 │ 18.5 MiB        │ 33.3 MiB          │
+│ item                   │          1 │               1 │     204000 │           204000 │ 18.6 MiB        │ 36.2 MiB          │
+│ time_dim               │          1 │               1 │      86400 │            86400 │ 1.0 MiB         │ 2.3 MiB           │
+│ date_dim               │          1 │               1 │      73049 │            73049 │ 1.7 MiB         │ 3.0 MiB           │
+│ catalog_page           │          1 │               1 │      20400 │            20400 │ 1.1 MiB         │ 2.0 MiB           │
+│ household_demographics │          1 │               1 │       7200 │             7200 │ 29.0 KiB        │ 33.9 KiB          │
+│ web_page               │          1 │               1 │       2040 │             2040 │ 35.5 KiB        │ 52.6 KiB          │
+│ promotion              │          1 │               1 │       1000 │             1000 │ 50.5 KiB        │ 79.7 KiB          │
+│ store                  │          1 │               1 │        402 │              402 │ 37.0 KiB        │ 52.0 KiB          │
+│ reason                 │          1 │               1 │         55 │               55 │ 1.2 KiB         │ 2.4 KiB           │
+│ call_center            │          1 │               1 │         30 │               30 │ 7.1 KiB         │ 7.7 KiB           │
+│ web_site               │          1 │               1 │         24 │               24 │ 6.2 KiB         │ 6.7 KiB           │
+│ ship_mode              │          1 │               1 │         20 │               20 │ 1.1 KiB         │ 1.4 KiB           │
+│ income_band            │          1 │               1 │         20 │               20 │ 389 bytes       │ 381 bytes         │
+│ warehouse              │          1 │               1 │         15 │               15 │ 2.2 KiB         │ 2.6 KiB           │
+├────────────────────────┴────────────┴─────────────────┴────────────┴──────────────────┴─────────────────┴───────────────────┤
+│ 24 rows                                                                                                           7 columns │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+## TPC-DS sf100 PySpark generated
+┌────────────────────────┬────────────┬─────────────────┬────────────┬──────────────────┬─────────────────┬───────────────────┐
+│       table_name       │ file_count │ row_group_count │ total_rows │ total_rows_check │ compressed_size │ uncompressed_size │
+│        varchar         │   int64    │      int64      │   int128   │      int128      │     varchar     │      varchar      │
+├────────────────────────┼────────────┼─────────────────┼────────────┼──────────────────┼─────────────────┼───────────────────┤
+│ inventory              │         96 │              96 │  399330000 │        399330000 │ 1.9 GiB         │ 1.9 GiB           │
+│ store_sales            │        117 │             117 │  287997024 │        287997024 │ 12.4 GiB        │ 13.0 GiB          │
+│ catalog_sales          │         96 │              96 │  143997065 │        143997065 │ 9.9 GiB         │ 10.2 GiB          │
+│ web_sales              │         96 │              96 │   72001237 │         72001237 │ 4.5 GiB         │ 4.6 GiB           │
+│ store_returns          │         96 │              96 │   28792282 │         28792282 │ 1.5 GiB         │ 1.6 GiB           │
+│ catalog_returns        │         96 │              96 │   14399221 │         14399221 │ 1018.3 MiB      │ 1.0 GiB           │
+│ web_returns            │         59 │              59 │    7199229 │          7199229 │ 509.4 MiB       │ 525.3 MiB         │
+│ customer               │         17 │              17 │    2000000 │          2000000 │ 103.4 MiB       │ 146.9 MiB         │
+│ customer_demographics  │          3 │               3 │    1920800 │          1920800 │ 7.4 MiB         │ 8.7 MiB           │
+│ customer_address       │          7 │               7 │    1000000 │          1000000 │ 19.1 MiB        │ 34.5 MiB          │
+│ item                   │          2 │               2 │     204000 │           204000 │ 18.8 MiB        │ 35.4 MiB          │
+│ time_dim               │          1 │               1 │      86400 │            86400 │ 1.0 MiB         │ 2.3 MiB           │
+│ date_dim               │          1 │               1 │      73049 │            73049 │ 1.7 MiB         │ 3.0 MiB           │
+│ catalog_page           │          1 │               1 │      20400 │            20400 │ 1.1 MiB         │ 2.0 MiB           │
+│ household_demographics │          1 │               1 │       7200 │             7200 │ 28.9 KiB        │ 33.8 KiB          │
+│ web_page               │          1 │               1 │       2040 │             2040 │ 34.7 KiB        │ 51.9 KiB          │
+│ promotion              │          1 │               1 │       1000 │             1000 │ 49.9 KiB        │ 79.4 KiB          │
+│ store                  │          1 │               1 │        402 │              402 │ 36.5 KiB        │ 51.9 KiB          │
+│ reason                 │          1 │               1 │         55 │               55 │ 1.1 KiB         │ 2.3 KiB           │
+│ call_center            │          1 │               1 │         30 │               30 │ 6.5 KiB         │ 7.1 KiB           │
+│ web_site               │          1 │               1 │         24 │               24 │ 5.4 KiB         │ 5.9 KiB           │
+│ ship_mode              │          1 │               1 │         20 │               20 │ 1.0 KiB         │ 1.3 KiB           │
+│ income_band            │          1 │               1 │         20 │               20 │ 341 bytes       │ 333 bytes         │
+│ warehouse              │          1 │               1 │         15 │               15 │ 1.8 KiB         │ 2.2 KiB           │
+├────────────────────────┴────────────┴─────────────────┴────────────┴──────────────────┴─────────────────┴───────────────────┤
+│ 24 rows                                                                                                           7 columns │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

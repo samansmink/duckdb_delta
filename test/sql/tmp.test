@@ -1,0 +1,50 @@
+# name: test/sql/tmp.test
+# description: test the late materialization optimization
+# group: [sql]
+
+require parquet
+
+require delta
+
+# Copy test data over to tmp test dir because we'll be inserting stuff
+statement ok
+from copy_dir('data/generated/really_simple', '__TEST_DIR__/late_materialization/really_simple');
+from copy_dir('data/generated/really_simple_partitioned', '__TEST_DIR__/late_materialization/really_simple_partitioned');
+
+statement ok
+ATTACH '__TEST_DIR__/late_materialization/really_simple/delta_lake' AS really_simple (TYPE delta);
+
+query II
+select count(*), sum(i) FROM really_simple;
+----
+10	45
+
+statement ok
+INSERT INTO really_simple VALUES (5);
+
+query II
+select count(*), sum(i) FROM really_simple;
+----
+11	50
+
+statement ok
+ATTACH '__TEST_DIR__/late_materialization/really_simple_partitioned/delta_lake' AS really_simple_partitioned (TYPE delta);
+
+query III
+select count(*), sum(i), sum(part) FROM really_simple_partitioned;
+----
+19	99	21
+
+statement ok
+INSERT INTO really_simple_partitioned VALUES (1, 2);
+
+query III
+select count(*), sum(i), sum(part) FROM really_simple_partitioned;
+----
+20	100	23
+
+
+
+
+
+

@@ -1,0 +1,143 @@
+# Table shape TPC-DS SF1
+## PySpark parquet lake
+┌────────────────────────┬─────────────┬──────────────────┬────────────┬─────────────────────┬────────────────────────┐
+│       table_name       │ total_files │ total_row_groups │ total_size │ row_groups_per_file │ average_row_group_size │
+│        varchar         │    int64    │      int64       │   int128   │       double        │         int64          │
+├────────────────────────┼─────────────┼──────────────────┼────────────┼─────────────────────┼────────────────────────┤
+│ inventory              │          16 │               16 │   11745000 │                 1.0 │                 734062 │
+│ store_sales            │          24 │               24 │    2880404 │                 1.0 │                 120017 │
+│ customer_demographics  │           3 │                3 │    1920800 │                 1.0 │                 640267 │
+│ catalog_sales          │          12 │               12 │    1441548 │                 1.0 │                 120129 │
+│ web_sales              │           6 │                6 │     719384 │                 1.0 │                 119897 │
+│ store_returns          │           3 │                3 │     287867 │                 1.0 │                  95956 │
+│ catalog_returns        │           2 │                2 │     144067 │                 1.0 │                  72034 │
+│ customer               │           1 │                1 │     100000 │                 1.0 │                 100000 │
+│ time_dim               │           1 │                1 │      86400 │                 1.0 │                  86400 │
+│ date_dim               │           1 │                1 │      73049 │                 1.0 │                  73049 │
+│ web_returns            │           1 │                1 │      71654 │                 1.0 │                  71654 │
+│ customer_address       │           1 │                1 │      50000 │                 1.0 │                  50000 │
+│ item                   │           1 │                1 │      18000 │                 1.0 │                  18000 │
+│ catalog_page           │           1 │                1 │      11718 │                 1.0 │                  11718 │
+│ household_demographics │           1 │                1 │       7200 │                 1.0 │                   7200 │
+│ promotion              │           1 │                1 │        300 │                 1.0 │                    300 │
+│ web_page               │           1 │                1 │         60 │                 1.0 │                     60 │
+│ reason                 │           1 │                1 │         35 │                 1.0 │                     35 │
+│ web_site               │           1 │                1 │         30 │                 1.0 │                     30 │
+│ ship_mode              │           1 │                1 │         20 │                 1.0 │                     20 │
+│ income_band            │           1 │                1 │         20 │                 1.0 │                     20 │
+│ store                  │           1 │                1 │         12 │                 1.0 │                     12 │
+│ call_center            │           1 │                1 │          6 │                 1.0 │                      6 │
+│ warehouse              │           1 │                1 │          5 │                 1.0 │                      5 │
+├────────────────────────┴─────────────┴──────────────────┴────────────┴─────────────────────┴────────────────────────┤
+│ 24 rows                                                                                                   6 columns │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+## PySpark delta lake
+┌────────────────────────┬─────────────┬──────────────────┬────────────┬─────────────────────┬────────────────────────┐
+│       table_name       │ total_files │ total_row_groups │ total_size │ row_groups_per_file │ average_row_group_size │
+│        varchar         │    int64    │      int64       │   int128   │       double        │         int64          │
+├────────────────────────┼─────────────┼──────────────────┼────────────┼─────────────────────┼────────────────────────┤
+│ inventory              │          16 │               16 │   11745000 │                 1.0 │                 734062 │
+│ store_sales            │          24 │               24 │    2880404 │                 1.0 │                 120017 │
+│ customer_demographics  │           3 │                3 │    1920800 │                 1.0 │                 640267 │
+│ catalog_sales          │          12 │               12 │    1441548 │                 1.0 │                 120129 │
+│ web_sales              │           6 │                6 │     719384 │                 1.0 │                 119897 │
+│ store_returns          │           3 │                3 │     287867 │                 1.0 │                  95956 │
+│ catalog_returns        │           2 │                2 │     144067 │                 1.0 │                  72034 │
+│ customer               │           1 │                1 │     100000 │                 1.0 │                 100000 │
+│ time_dim               │           1 │                1 │      86400 │                 1.0 │                  86400 │
+│ date_dim               │           1 │                1 │      73049 │                 1.0 │                  73049 │
+│ web_returns            │           1 │                1 │      71654 │                 1.0 │                  71654 │
+│ customer_address       │           1 │                1 │      50000 │                 1.0 │                  50000 │
+│ item                   │           1 │                1 │      18000 │                 1.0 │                  18000 │
+│ catalog_page           │           1 │                1 │      11718 │                 1.0 │                  11718 │
+│ household_demographics │           1 │                1 │       7200 │                 1.0 │                   7200 │
+│ promotion              │           1 │                1 │        300 │                 1.0 │                    300 │
+│ web_page               │           1 │                1 │         60 │                 1.0 │                     60 │
+│ reason                 │           1 │                1 │         35 │                 1.0 │                     35 │
+│ web_site               │           1 │                1 │         30 │                 1.0 │                     30 │
+│ ship_mode              │           1 │                1 │         20 │                 1.0 │                     20 │
+│ income_band            │           1 │                1 │         20 │                 1.0 │                     20 │
+│ store                  │           1 │                1 │         12 │                 1.0 │                     12 │
+│ call_center            │           1 │                1 │          6 │                 1.0 │                      6 │
+│ warehouse              │           1 │                1 │          5 │                 1.0 │                      5 │
+├────────────────────────┴─────────────┴──────────────────┴────────────┴─────────────────────┴────────────────────────┤
+│ 24 rows                                                                                                   6 columns │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+## DeltaRS delta lake
+┌────────────────────────┬─────────────┬──────────────────┬────────────┬─────────────────────┬────────────────────────┐
+│       table_name       │ total_files │ total_row_groups │ total_size │ row_groups_per_file │ average_row_group_size │
+│        varchar         │    int64    │      int64       │   int128   │       double        │         int64          │
+├────────────────────────┼─────────────┼──────────────────┼────────────┼─────────────────────┼────────────────────────┤
+│ inventory              │           2 │              177 │   11745000 │                88.5 │                  66356 │
+│ store_sales            │           1 │               44 │    2880404 │                44.0 │                  65464 │
+│ customer_demographics  │           1 │               30 │    1920800 │                30.0 │                  64027 │
+│ catalog_sales          │           1 │               22 │    1441548 │                22.0 │                  65525 │
+│ web_sales              │           1 │               11 │     719384 │                11.0 │                  65399 │
+│ store_returns          │           1 │                5 │     287867 │                 5.0 │                  57573 │
+│ catalog_returns        │           1 │                3 │     144067 │                 3.0 │                  48022 │
+│ customer               │           1 │                2 │     100000 │                 2.0 │                  50000 │
+│ time_dim               │           1 │                2 │      86400 │                 2.0 │                  43200 │
+│ date_dim               │           1 │                2 │      73049 │                 2.0 │                  36524 │
+│ web_returns            │           1 │                2 │      71654 │                 2.0 │                  35827 │
+│ customer_address       │           1 │                1 │      50000 │                 1.0 │                  50000 │
+│ item                   │           1 │                1 │      18000 │                 1.0 │                  18000 │
+│ catalog_page           │           1 │                1 │      11718 │                 1.0 │                  11718 │
+│ household_demographics │           1 │                1 │       7200 │                 1.0 │                   7200 │
+│ promotion              │           1 │                1 │        300 │                 1.0 │                    300 │
+│ web_page               │           1 │                1 │         60 │                 1.0 │                     60 │
+│ reason                 │           1 │                1 │         35 │                 1.0 │                     35 │
+│ web_site               │           1 │                1 │         30 │                 1.0 │                     30 │
+│ ship_mode              │           1 │                1 │         20 │                 1.0 │                     20 │
+│ income_band            │           1 │                1 │         20 │                 1.0 │                     20 │
+│ store                  │           1 │                1 │         12 │                 1.0 │                     12 │
+│ call_center            │           1 │                1 │          6 │                 1.0 │                      6 │
+│ warehouse              │           1 │                1 │          5 │                 1.0 │                      5 │
+├────────────────────────┴─────────────┴──────────────────┴────────────┴─────────────────────┴────────────────────────┤
+│ 24 rows                                                                                                   6 columns │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+## DuckDB parquet
+┌────────────────────────┬─────────────┬──────────────────┬────────────┬─────────────────────┬────────────────────────┐
+│       table_name       │ total_files │ total_row_groups │ total_size │ row_groups_per_file │ average_row_group_size │
+│        varchar         │    int64    │      int64       │   int128   │       double        │         int64          │
+├────────────────────────┼─────────────┼──────────────────┼────────────┼─────────────────────┼────────────────────────┤
+│ inventory              │           1 │               96 │   11745000 │                96.0 │                 122344 │
+│ store_sales            │           1 │               24 │    2880404 │                24.0 │                 120017 │
+│ customer_demographics  │           1 │               16 │    1920800 │                16.0 │                 120050 │
+│ catalog_sales          │           1 │               12 │    1441548 │                12.0 │                 120129 │
+│ web_sales              │           1 │                6 │     719384 │                 6.0 │                 119897 │
+│ store_returns          │           1 │                3 │     287867 │                 3.0 │                  95956 │
+│ catalog_returns        │           1 │                2 │     144067 │                 2.0 │                  72034 │
+│ customer               │           1 │                1 │     100000 │                 1.0 │                 100000 │
+│ time_dim               │           1 │                1 │      86400 │                 1.0 │                  86400 │
+│ date_dim               │           1 │                1 │      73049 │                 1.0 │                  73049 │
+│ web_returns            │           1 │                1 │      71654 │                 1.0 │                  71654 │
+│ customer_address       │           1 │                1 │      50000 │                 1.0 │                  50000 │
+│ item                   │           1 │                1 │      18000 │                 1.0 │                  18000 │
+│ catalog_page           │           1 │                1 │      11718 │                 1.0 │                  11718 │
+│ household_demographics │           1 │                1 │       7200 │                 1.0 │                   7200 │
+│ promotion              │           1 │                1 │        300 │                 1.0 │                    300 │
+│ web_page               │           1 │                1 │         60 │                 1.0 │                     60 │
+│ reason                 │           1 │                1 │         35 │                 1.0 │                     35 │
+│ web_site               │           1 │                1 │         30 │                 1.0 │                     30 │
+│ ship_mode              │           1 │                1 │         20 │                 1.0 │                     20 │
+│ income_band            │           1 │                1 │         20 │                 1.0 │                     20 │
+│ store                  │           1 │                1 │         12 │                 1.0 │                     12 │
+│ call_center            │           1 │                1 │          6 │                 1.0 │                      6 │
+│ warehouse              │           1 │                1 │          5 │                 1.0 │                      5 │
+├────────────────────────┴─────────────┴──────────────────┴────────────┴─────────────────────┴────────────────────────┤
+│ 24 rows                                                                                                   6 columns │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+# Analysis
+
+## Pyspark written parquet is slow on Q16
+Firstly it's interesting to note that Pyspark writes exactly the same to delta as parquet. Which is unexpected because we see a huge difference in
+performance for TPC-DS Q16: running this query on pyspark parquet is almost an order of magnitude slower. This seems to suggests that DuckDB has to
+read a lot of parquet file metadata for that query making it a lot slower.
+
+## Delta-RS written delta tables are slow
+Interestingly, the Delta-RS tables have smaller row group size than the pyspark written table (around half the size) would this explain the fact that
+the delta-rs tables are much (2x) slower than the pyspark ones? This difference could also be explained by the fact that the pyspark tables use different
+encodings?

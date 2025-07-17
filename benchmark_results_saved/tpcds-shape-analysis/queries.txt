@@ -1,0 +1,76 @@
+# Compression
+SELECT
+	compression,
+	count(distinct row_group_id) as row_group_count
+FROM
+	parquet_metadata('/mount/mount/delta_benchmarking/tpcds_sf100_pyspark/*/delta_lake/**/*.parquet')
+GROUP BY
+	compression
+
+# Encodings
+SELECT
+      encodings,
+      count(distinct row_group_id) as row_group_count
+  FROM
+      parquet_metadata('/mount/mount/delta_benchmarking/tpcds_sf100_pyspark/*/delta_lake/**/*.parquet')
+  GROUP BY
+      encodings;
+
+# Get files/rowgroups/tuplecounts
+SET VARIABLE delta_glob = (SELECT LIST(filename) FROM (
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/call_center', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/catalog_page', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/catalog_returns', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/catalog_sales', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/customer', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/customer_demographics', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/customer_address', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/date_dim', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/household_demographics', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/inventory', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/income_band', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/item', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/promotion', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/reason', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/ship_mode', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/store', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/store_returns', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/store_sales', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/time_dim', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/warehouse', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/web_page', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/web_returns', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/web_sales', filename=1) UNION ALL
+    select DISTINCT filename, from delta_scan('/mount/delta_benchmarking/tpcds-liquid-clustered-100gb/web_site', filename=1)
+    )
+)
+
+SET VARIABLE delta_glob = '/mount/delta_benchmarking/tpcds_sf100_pyspark/*/delta_lake/**/*.parquet';
+SET VARIABLE table_index_in_path = 5;
+
+SELECT
+    file_name.split('/')[getvariable('table_index_in_path')] AS table_name,
+    count(distinct file_name) as file_count,
+    count(row_group_id) as row_group_count,
+    sum(min_num_values) as total_rows,
+    sum(max_num_values) as total_rows_check,
+    format_bytes(sum(compressed_size)::BIGINT) as compressed_size,
+    format_bytes(sum(uncompressed_size)::BIGINT) as uncompressed_size,
+FROM (
+    SELECT
+        file_name,
+        row_group_id,
+        sum(total_compressed_size) as compressed_size,
+        sum(total_uncompressed_size) as uncompressed_size,
+        min(num_values) as min_num_values,
+        max(num_values) as max_num_values,
+    FROM
+        parquet_metadata(getvariable('delta_glob'))
+    GROUP BY
+        file_name, row_group_id
+)
+GROUP BY
+    table_name
+ORDER BY
+    total_rows DESC
+;

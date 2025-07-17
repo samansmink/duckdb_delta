@@ -1,0 +1,18 @@
+# name: benchmark/micro/partition_aware_aggregation/tpch_sf10_q1_baseline.benchmark
+# description: Reference result to compare to
+# group: [micro]
+
+name partition aware tpch sf10 partitioned
+group partition_aware
+
+require tpch
+
+require delta
+
+require parquet
+
+load
+ATTACH './data/generated/tpch_sf10_partitioned/lineitem/delta_lake' as lineitem (TYPE delta, PIN_SNAPSHOT, pushdown_partition_info 1, pushdown_filters 'none');
+
+run
+pragma tpch(1)

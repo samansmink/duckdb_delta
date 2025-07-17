@@ -1,0 +1,307 @@
+┌────────────────────────────────────────────────┐
+│┌──────────────────────────────────────────────┐│
+││              Total Time: 19.66s              ││
+│└──────────────────────────────────────────────┘│
+└────────────────────────────────────────────────┘
+┌─────────────┐
+│    QUERY    │
+│    ──────   │
+│    0 Rows   │
+│   (0.00s)   │
+└──────┬──────┘
+┌──────┴──────┐
+│EXPLAIN_...  │
+│    ──────   │
+│    0 Rows   │
+│   (0.00s)   │
+└──────┬──────┘
+┌──────┴──────┐
+│    TOP_N    │
+│    ──────   │
+│     Top:    │
+│     100     │
+│             │
+│  Order By:  │
+│sq3.c_last_na│
+│    me ASC   │
+│sq3.c_first_n│
+│   ame ASC   │
+│sq3.sales ASC│
+│             │
+│   100 Rows  │
+│   (0.01s)   │
+└──────┬──────┘
+┌──────┴──────┐
+│     CTE     │
+│    ──────   │
+│  CTE Name:  │
+│frequent_ss_i│
+│     tems    │
+│             ├─────────────────────────────────────┐
+│ Table Index:│                                     │
+│      0      │                                     │
+│             │                                     │
+│    0 Rows   │                                     │
+│   (0.22s)   │                                     │
+└──────┬──────┘                                     │
+┌──────┴──────┐                              ┌──────┴──────┐
+│    FILTER   │                              │     CTE     │
+│    ──────   │                              │    ──────   │
+│ (count_star(│                              │  CTE Name:  │
+│    ) > 4)   │                              │best_ss_custo│
+│             │                              │     mer     │
+│             │                              │             ├───────────────────────────────────────────────────────────────────┐
+│             │                              │ Table Index:│                                                                   │
+│             │                              │      34     │                                                                   │
+│             │                              │             │                                                                   │
+│ 4799578 Rows│                              │    0 Rows   │                                                                   │
+│   (0.18s)   │                              │   (0.01s)   │                                                                   │
+└──────┬──────┘                              └──────┬──────┘                                                                   │
+┌──────┴──────┐                              ┌──────┴──────┐                                                            ┌──────┴──────┐
+│HASH_GROUP_BY│                              │  PROJECTION │                                                            │    UNION    │
+│    ──────   │                              │    ──────   │                                                            │    ──────   │
+│   Groups:   │                              │c_customer_sk│                                                            │             │
+│      #0     │                              │    ssales   │                                                            │             │
+│      #1     │                              │             │                                                            │             │
+│      #2     │                              │             │                                                            │             │
+│             │                              │             │                                                            │             ├───────────────────────────────────────────────────────────────────┐
+│ Aggregates: │                              │             │                                                            │             │                                                                   │
+│ count_star()│                              │             │                                                            │             │                                                                   │
+│             │                              │             │                                                            │             │                                                                   │
+│79157027 Rows│                              │ 887261 Rows │                                                            │    0 Rows   │                                                                   │
+│   (57.47s)  │                              │   (0.00s)   │                                                            │   (0.00s)   │                                                                   │
+└──────┬──────┘                              └──────┬──────┘                                                            └──────┬──────┘                                                                   │
+┌──────┴──────┐                              ┌──────┴──────┐                                                            ┌──────┴──────┐                                                            ┌──────┴──────┐
+│  PROJECTION │                              │    FILTER   │                                                            │HASH_GROUP_BY│                                                            │HASH_GROUP_BY│
+│    ──────   │                              │    ──────   │                                                            │    ──────   │                                                            │    ──────   │
+│   itemdesc  │                              │  (CAST(sum( │                                                            │   Groups:   │                                                            │   Groups:   │
+│  i_item_sk  │                              │(CAST(ss_quan│                                                            │      #0     │                                                            │      #0     │
+│    d_date   │                              │tity AS DECIM│                                                            │      #1     │                                                            │      #1     │
+│             │                              │ AL(17,0)) * │                                                            │             │                                                            │             │
+│             │                              │ CAST(ss_sale│                                                            │ Aggregates: │                                                            │ Aggregates: │
+│             │                              │  s_price AS │                                                            │   sum(#2)   │                                                            │   sum(#2)   │
+│             │                              │  DECIMAL(17 │                                                            │             │                                                            │             │
+│             │                              │  ,2)))) AS  │                                                            │             │                                                            │             │
+│             │                              │  DOUBLE) >  │                                                            │             │                                                            │             │
+│             │                              │ (0.5 * CAST │                                                            │             │                                                            │             │
+│             │                              │(max(tpcds_cm│                                                            │             │                                                            │             │
+│             │                              │ax) AS DOUBLE│                                                            │             │                                                            │             │
+│             │                              │     )))     │                                                            │             │                                                            │             │
+│             │                              │             │                                                            │             │                                                            │             │
+│16560281...  │                              │ 887261 Rows │                                                            │  54670 Rows │                                                            │  22347 Rows │
+│   (0.02s)   │                              │   (0.05s)   │                                                            │   (0.70s)   │                                                            │   (0.23s)   │
+└──────┬──────┘                              └──────┬──────┘                                                            └──────┬──────┘                                                            └──────┬──────┘
+┌──────┴──────┐                              ┌──────┴──────┐                                                            ┌──────┴──────┐                                                            ┌──────┴──────┐
+│  PROJECTION │                              │HASH_GROUP_BY│                                                            │  PROJECTION │                                                            │  PROJECTION │
+│    ──────   │                              │    ──────   │                                                            │    ──────   │                                                            │    ──────   │
+│      #3     │                              │   Groups:   │                                                            │ c_last_name │                                                            │ c_last_name │
+│      #4     │                              │      #0     │                                                            │ c_first_name│                                                            │ c_first_name│
+│      #5     │                              │             │                                                            │(CAST(cs_quan│                                                            │(CAST(ws_quan│
+│             │                              │ Aggregates: │                                                            │tity AS DECIM│                                                            │tity AS DECIM│
+│             │                              │   sum(#1)   │                                                            │ AL(17,0)) * │                                                            │ AL(17,0)) * │
+│             │                              │   max(#2)   │                                                            │ CAST(cs_list│                                                            │ CAST(ws_list│
+│             │                              │             │                                                            │  _price AS  │                                                            │  _price AS  │
+│             │                              │             │                                                            │  DECIMAL(17 │                                                            │  DECIMAL(17 │
+│             │                              │             │                                                            │    ,2)))    │                                                            │    ,2)))    │
+│             │                              │             │                                                            │             │                                                            │             │
+│16560281...  │                              │ 1999980 Rows│                                                            │17987212 Rows│                                                            │ 9201386 Rows│
+│   (0.04s)   │                              │   (25.77s)  │                                                            │   (0.20s)   │                                                            │   (0.08s)   │
+└──────┬──────┘                              └──────┬──────┘                                                            └──────┬──────┘                                                            └──────┬──────┘
+┌──────┴──────┐                              ┌──────┴──────┐                                                            ┌──────┴──────┐                                                            ┌──────┴──────┐
+│  HASH_JOIN  │                              │  PROJECTION │                                                            │  HASH_JOIN  │                                                            │  HASH_JOIN  │
+│    ──────   │                              │    ──────   │                                                            │    ──────   │                                                            │    ──────   │
+│  Join Type: │                              │c_customer_sk│                                                            │  Join Type: │                                                            │  Join Type: │
+│    INNER    │                              │(CAST(ss_quan│                                                            │    INNER    │                                                            │    INNER    │
+│             │                              │tity AS DECIM│                                                            │             │                                                            │             │
+│ Conditions: │                              │ AL(17,0)) * │                                                            │ Conditions: │                                                            │ Conditions: │
+│ ss_item_sk =│                              │ CAST(ss_sale│                                                            │cs_bill_custo│                                                            │ws_bill_custo│
+│   i_item_sk │                              │  s_price AS │                                                            │   mer_sk =  │                                                            │   mer_sk =  │
+│             ├──────────────────────┐       │  DECIMAL(17 │                                                            │ c_customer_s├─────────────────────────────────────┐                      │ c_customer_s├──────────────────────────────
+│             │                      │       │    ,2)))    │                                                            │      k      │                                     │                      │      k      │
+│             │                      │       │  tpcds_cmax │                                                            │cs_bill_custo│                                     │                      │ws_bill_custo│
+│             │                      │       │             │                                                            │   mer_sk =  │                                     │                      │   mer_sk =  │
+│             │                      │       │             │                                                            │ c_customer_s│                                     │                      │ c_customer_s│
+│             │                      │       │             │                                                            │      k      │                                     │                      │      k      │
+│             │                      │       │             │                                                            │             │                                     │                      │             │
+│16560281...  │                      │       │27504687...  │                                                            │17987212 Rows│                                     │                      │ 9201386 Rows│
+│   (5.97s)   │                      │       │   (2.62s)   │                                                            │   (5.94s)   │                                     │                      │   (2.06s)   │
+└──────┬──────┘                      │       └──────┬──────┘                                                            └──────┬──────┘                                     │                      └──────┬──────┘
+┌──────┴──────┐               ┌──────┴──────┐┌──────┴──────┐                                                            ┌──────┴──────┐                              ┌──────┴──────┐               ┌──────┴──────┐
+│  HASH_JOIN  │               │  PROJECTION ││  PROJECTION │                                                            │  HASH_JOIN  │                              │  HASH_JOIN  │               │  HASH_JOIN  │
+│    ──────   │               │    ──────   ││    ──────   │                                                            │    ──────   │                              │    ──────   │               │    ──────   │
+│  Join Type: │               │   itemdesc  ││      #1     │                                                            │  Join Type: │                              │  Join Type: │               │  Join Type: │
+│    INNER    │               │  i_item_sk  ││      #2     │                                                            │    INNER    │                              │    INNER    │               │    INNER    │
+│             │               │             ││      #3     │                                                            │             │                              │             │               │             │
+│ Conditions: │               │             ││      #4     │                                                            │ Conditions: │                              │ Conditions: │               │ Conditions: │
+│ss_sold_date_├───────┐       │             ││             │                                                            │ cs_item_sk =├──────────────────────┐       │c_customer_sk├───────┐       │ ws_item_sk =├──────────────────────┐
+│sk = d_date_s│       │       │             ││             │                                                            │    item_sk  │                      │       │ = c_customer│       │       │    item_sk  │                      │
+│      k      │       │       │             ││             │                                                            │             │                      │       │     _sk     │       │       │             │                      │
+│             │       │       │             ││             │                                                            │             │                      │       │             │       │       │             │                      │
+│16560281...  │       │       │ 204000 Rows ││27504687...  │                                                            │40885238 Rows│                      │       │ 887261 Rows │       │       │20749854 Rows│                      │
+│   (3.43s)   │       │       │   (0.01s)   ││   (0.05s)   │                                                            │   (0.96s)   │                      │       │   (0.07s)   │       │       │   (0.77s)   │                      │
+└──────┬──────┘       │       └──────┬──────┘└──────┬──────┘                                                            └──────┬──────┘                      │       └──────┬──────┘       │       └──────┬──────┘                      │
+┌──────┴──────┐┌──────┴──────┐┌──────┴──────┐┌──────┴──────┐                                                            ┌──────┴──────┐               ┌──────┴──────┐┌──────┴──────┐┌──────┴──────┐┌──────┴──────┐               ┌──────┴──────┐
+│  TABLE_SCAN ││    FILTER   ││  TABLE_SCAN ││  HASH_JOIN  │                                                            │  HASH_JOIN  │               │   CTE_SCAN  ││  TABLE_SCAN ││   CTE_SCAN  ││  HASH_JOIN  │               │   CTE_SCAN  │
+│    ──────   ││    ──────   ││    ──────   ││    ──────   │                                                            │    ──────   │               │    ──────   ││    ──────   ││    ──────   ││    ──────   │               │    ──────   │
+│  Function:  ││  ((d_year = ││  Function:  ││  Join Type: │                                                            │  Join Type: │               │  CTE Index: ││  Function:  ││  CTE Index: ││  Join Type: │               │  CTE Index: │
+│  DELTA_SCAN ││   2000) OR  ││  DELTA_SCAN ││    INNER    │                                                            │    INNER    │               │      0      ││  DELTA_SCAN ││      34     ││    INNER    │               │      0      │
+│             ││  (d_year =  ││             ││             │                                                            │             │               │             ││             ││             ││             │               │             │
+│ Projections:││   2001) OR  ││ Projections:││ Conditions: │                                                            │ Conditions: │               │             ││ Projections:││             ││ Conditions: │               │             │
+│ss_sold_date_││  (d_year =  ││  i_item_sk  ││ss_customer_s│                                                            │cs_sold_date_│               │             ││c_customer_sk││             ││ws_sold_date_│               │             │
+│      sk     ││   2002) OR  ││ i_item_desc ││k = c_custome│                                                            │sk = d_date_s│               │             ││c_customer_id││             ││sk = d_date_s│               │             │
+│  ss_item_sk ││  (d_year =  ││             ││     r_sk    │                                                            │      k      │               │             ││c_current_cde││             ││      k      │               │             │
+│             ││    2003))   ││             ││             │                                                            │             │               │             ││    mo_sk    ││             ││             │               │             │
+│             ││             ││             ││             │                                                            │             │               │             ││c_current_hde││             ││             │               │             │
+│             ││             ││             ││             │                                                            │             │               │             ││    mo_sk    ││             ││             │               │             │
+│             ││             ││             ││             │                                                            │             │               │             ││c_current_add││             ││             │               │             │
+│             ││             ││             ││             │                                                            │             │               │             ││     r_sk    ││             ││             │               │             │
+│             ││             ││             ││             │                                                            │             │               │             ││c_first_shipt││             ││             │               │             │
+│             ││             ││             ││             ├───────┐                                                    │             ├───────┐       │             ││  o_date_sk  ││             ││             ├───────┐       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││c_first_sales││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││   _date_sk  ││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││ c_salutation││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││ c_first_name││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││ c_last_name ││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││c_preferred_c││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││   ust_flag  ││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││ c_birth_day ││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││c_birth_month││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││ c_birth_year││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││c_birth_count││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││      ry     ││             ││             │       │       │             │
+│             ││             ││             ││             │       │                                                    │             │       │       │             ││   c_login   ││             ││             │       │       │             │
+│16560281...  ││  1461 Rows  ││ 204000 Rows ││27504687...  │       │                                                    │ 1308771 Rows│       │       │ 4799578 Rows││c_email_addre││ 887261 Rows ││ 663931 Rows │       │       │ 4799578 Rows│
+│   (8.82s)   ││   (0.00s)   ││   (0.03s)   ││   (12.72s)  │       │                                                    │   (0.02s)   │       │       │   (0.03s)   ││      ss     ││   (0.00s)   ││   (0.02s)   │       │       │   (0.02s)   │
+└─────────────┘└──────┬──────┘└─────────────┘└──────┬──────┘       │                                                    └──────┬──────┘       │       └─────────────┘└─────────────┘└─────────────┘└──────┬──────┘       │       └─────────────┘
+               ┌──────┴──────┐               ┌──────┴──────┐┌──────┴──────┐                                             ┌──────┴──────┐┌──────┴──────┐                                             ┌──────┴──────┐┌──────┴──────┐
+               │  TABLE_SCAN │               │  TABLE_SCAN ││CROSS_PRODUCT│                                             │  TABLE_SCAN ││  TABLE_SCAN │                                             │  TABLE_SCAN ││  TABLE_SCAN │
+               │    ──────   │               │    ──────   ││    ──────   │                                             │    ──────   ││    ──────   │                                             │    ──────   ││    ──────   │
+               │  Function:  │               │  Function:  ││             │                                             │  Function:  ││  Function:  │                                             │  Function:  ││  Function:  │
+               │  DELTA_SCAN │               │  DELTA_SCAN ││             │                                             │  DELTA_SCAN ││  DELTA_SCAN │                                             │  DELTA_SCAN ││  DELTA_SCAN │
+               │             │               │             ││             │                                             │             ││             │                                             │             ││             │
+               │ Projections:│               │ Projections:││             │                                             │ Projections:││ Projections:│                                             │ Projections:││ Projections:│
+               │  d_date_sk  │               │ss_customer_s││             │                                             │cs_sold_date_││  d_date_sk  │                                             │ws_sold_date_││  d_date_sk  │
+               │    d_date   │               │      k      ││             │                                             │      sk     ││             │                                             │      sk     ││             │
+               │    d_year   │               │ ss_quantity ││             │                                             │cs_bill_custo││   Filters:  │                                             │  ws_item_sk ││   Filters:  │
+               │             │               │ss_sales_pric││             ├───────┐                                     │    mer_sk   ││ d_moy=2 AND │                                             │ws_bill_custo││ d_moy=2 AND │
+               │             │               │      e      ││             │       │                                     │  cs_item_sk ││   d_moy IS  │                                             │    mer_sk   ││   d_moy IS  │
+               │             │               │             ││             │       │                                     │ cs_quantity ││   NOT NULL  │                                             │ ws_quantity ││   NOT NULL  │
+               │             │               │             ││             │       │                                     │cs_list_price││ d_year=2000 │                                             │ws_list_price││ d_year=2000 │
+               │             │               │             ││             │       │                                     │             ││  AND d_year │                                             │             ││  AND d_year │
+               │             │               │             ││             │       │                                     │             ││  IS NOT NULL│                                             │             ││  IS NOT NULL│
+               │             │               │             ││             │       │                                     │             ││             │                                             │             ││             │
+               │  73049 Rows │               │27504687...  ││ 2000000 Rows│       │                                     │ 1308771 Rows││   29 Rows   │                                             │ 663931 Rows ││   29 Rows   │
+               │   (0.00s)   │               │   (14.58s)  ││   (0.00s)   │       │                                     │   (0.86s)   ││   (0.00s)   │                                             │   (0.77s)   ││   (0.00s)   │
+               └─────────────┘               └─────────────┘└──────┬──────┘       │                                     └─────────────┘└─────────────┘                                             └─────────────┘└─────────────┘
+                                                            ┌──────┴──────┐┌──────┴──────┐
+                                                            │  TABLE_SCAN ││UNGROUPE...  │
+                                                            │    ──────   ││    ──────   │
+                                                            │  Function:  ││ Aggregates: │
+                                                            │  DELTA_SCAN ││   max(#0)   │
+                                                            │             ││             │
+                                                            │ Projections:││             │
+                                                            │c_customer_sk││             │
+                                                            │             ││             │
+                                                            │ 2000000 Rows││    1 Rows   │
+                                                            │   (0.01s)   ││   (0.00s)   │
+                                                            └─────────────┘└──────┬──────┘
+                                                                           ┌──────┴──────┐
+                                                                           │  PROJECTION │
+                                                                           │    ──────   │
+                                                                           │    csales   │
+                                                                           │             │
+                                                                           │ 1998529 Rows│
+                                                                           │   (0.00s)   │
+                                                                           └──────┬──────┘
+                                                                           ┌──────┴──────┐
+                                                                           │  PROJECTION │
+                                                                           │    ──────   │
+                                                                           │    csales   │
+                                                                           │             │
+                                                                           │ 1998529 Rows│
+                                                                           │   (0.00s)   │
+                                                                           └──────┬──────┘
+                                                                           ┌──────┴──────┐
+                                                                           │HASH_GROUP_BY│
+                                                                           │    ──────   │
+                                                                           │   Groups:   │
+                                                                           │      #0     │
+                                                                           │             │
+                                                                           │ Aggregates: │
+                                                                           │   sum(#1)   │
+                                                                           │             │
+                                                                           │ 1998529 Rows│
+                                                                           │   (22.98s)  │
+                                                                           └──────┬──────┘
+                                                                           ┌──────┴──────┐
+                                                                           │  PROJECTION │
+                                                                           │    ──────   │
+                                                                           │c_customer_sk│
+                                                                           │(CAST(ss_quan│
+                                                                           │tity AS DECIM│
+                                                                           │ AL(17,0)) * │
+                                                                           │ CAST(ss_sale│
+                                                                           │  s_price AS │
+                                                                           │  DECIMAL(17 │
+                                                                           │    ,2)))    │
+                                                                           │             │
+                                                                           │16170341...  │
+                                                                           │   (1.49s)   │
+                                                                           └──────┬──────┘
+                                                                           ┌──────┴──────┐
+                                                                           │  PROJECTION │
+                                                                           │    ──────   │
+                                                                           │      #2     │
+                                                                           │      #3     │
+                                                                           │      #4     │
+                                                                           │             │
+                                                                           │16170341...  │
+                                                                           │   (0.02s)   │
+                                                                           └──────┬──────┘
+                                                                           ┌──────┴──────┐
+                                                                           │  HASH_JOIN  │
+                                                                           │    ──────   │
+                                                                           │  Join Type: │
+                                                                           │    INNER    │
+                                                                           │             │
+                                                                           │ Conditions: │
+                                                                           │ss_sold_date_├──────────────────────┐
+                                                                           │sk = d_date_s│                      │
+                                                                           │      k      │                      │
+                                                                           │             │                      │
+                                                                           │16170341...  │                      │
+                                                                           │   (2.33s)   │                      │
+                                                                           └──────┬──────┘                      │
+                                                                           ┌──────┴──────┐               ┌──────┴──────┐
+                                                                           │  HASH_JOIN  │               │    FILTER   │
+                                                                           │    ──────   │               │    ──────   │
+                                                                           │  Join Type: │               │  ((d_year = │
+                                                                           │    INNER    │               │   2000) OR  │
+                                                                           │             │               │  (d_year =  │
+                                                                           │ Conditions: │               │   2001) OR  │
+                                                                           │ss_customer_s├───────┐       │  (d_year =  │
+                                                                           │k = c_custome│       │       │   2002) OR  │
+                                                                           │     r_sk    │       │       │  (d_year =  │
+                                                                           │             │       │       │    2003))   │
+                                                                           │             │       │       │             │
+                                                                           │16170341...  │       │       │  1461 Rows  │
+                                                                           │   (6.16s)   │       │       │   (0.00s)   │
+                                                                           └──────┬──────┘       │       └──────┬──────┘
+                                                                           ┌──────┴──────┐┌──────┴──────┐┌──────┴──────┐
+                                                                           │  TABLE_SCAN ││  TABLE_SCAN ││  TABLE_SCAN │
+                                                                           │    ──────   ││    ──────   ││    ──────   │
+                                                                           │  Function:  ││  Function:  ││  Function:  │
+                                                                           │  DELTA_SCAN ││  DELTA_SCAN ││  DELTA_SCAN │
+                                                                           │             ││             ││             │
+                                                                           │ Projections:││ Projections:││ Projections:│
+                                                                           │ss_sold_date_││c_customer_sk││  d_date_sk  │
+                                                                           │      sk     ││             ││    d_year   │
+                                                                           │ss_customer_s││             ││             │
+                                                                           │      k      ││             ││             │
+                                                                           │ ss_quantity ││             ││             │
+                                                                           │ss_sales_pric││             ││             │
+                                                                           │      e      ││             ││             │
+                                                                           │             ││             ││             │
+                                                                           │16170341...  ││ 2000000 Rows││  73049 Rows │
+                                                                           │   (12.25s)  ││   (0.01s)   ││   (0.00s)   │
+                                                                           └─────────────┘└─────────────┘└─────────────┘

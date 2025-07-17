@@ -1,0 +1,6 @@
+name	run	timing
+benchmark/micro/partition_aware_aggregation/tpch_sf10_q1_partitioned_not_forwarded.benchmark	1	0.467718
+benchmark/micro/partition_aware_aggregation/tpch_sf10_q1_partitioned_not_forwarded.benchmark	2	0.468224
+benchmark/micro/partition_aware_aggregation/tpch_sf10_q1_partitioned_not_forwarded.benchmark	3	0.463993
+benchmark/micro/partition_aware_aggregation/tpch_sf10_q1_partitioned_not_forwarded.benchmark	4	0.468621
+benchmark/micro/partition_aware_aggregation/tpch_sf10_q1_partitioned_not_forwarded.benchmark	5	0.485616

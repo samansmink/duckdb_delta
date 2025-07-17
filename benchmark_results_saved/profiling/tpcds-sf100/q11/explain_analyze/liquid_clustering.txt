@@ -1,0 +1,396 @@
+┌─────────────────────────────────────┐
+│┌───────────────────────────────────┐│
+││    Query Profiling Information    ││
+│└───────────────────────────────────┘│
+└─────────────────────────────────────┘
+EXPLAIN ANALYZE WITH year_total AS   (SELECT c_customer_id customer_id,           c_first_name customer_first_name,           c_last_name customer_last_name,           c_preferred_cust_flag customer_preferred_cust_flag,           c_birth_country customer_birth_country,           c_login customer_login,           c_email_address customer_email_address,           d_year dyear,           sum(ss_ext_list_price-ss_ext_discount_amt) year_total,           's' sale_type    FROM customer,         store_sales,         date_dim    WHERE c_customer_sk = ss_customer_sk      AND ss_sold_date_sk = d_date_sk    GROUP BY c_customer_id,             c_first_name,             c_last_name,             c_preferred_cust_flag,             c_birth_country,             c_login,             c_email_address,             d_year    UNION ALL SELECT c_customer_id customer_id,                     c_first_name customer_first_name,                     c_last_name customer_last_name,                     c_preferred_cust_flag customer_preferred_cust_flag,                     c_birth_country customer_birth_country,                     c_login customer_login,                     c_email_address customer_email_address,                     d_year dyear,                     sum(ws_ext_list_price-ws_ext_discount_amt) year_total,                     'w' sale_type    FROM customer,         web_sales,         date_dim    WHERE c_customer_sk = ws_bill_customer_sk      AND ws_sold_date_sk = d_date_sk    GROUP BY c_customer_id,             c_first_name,             c_last_name,             c_preferred_cust_flag,             c_birth_country,             c_login,             c_email_address,             d_year) SELECT t_s_secyear.customer_id,        t_s_secyear.customer_first_name,        t_s_secyear.customer_last_name,        t_s_secyear.customer_preferred_cust_flag FROM year_total t_s_firstyear,      year_total t_s_secyear,      year_total t_w_firstyear,      year_total t_w_secyear WHERE t_s_secyear.customer_id = t_s_firstyear.customer_id   AND t_s_firstyear.customer_id = t_w_secyear.customer_id   AND t_s_firstyear.customer_id = t_w_firstyear.customer_id   AND t_s_firstyear.sale_type = 's'   AND t_w_firstyear.sale_type = 'w'   AND t_s_secyear.sale_type = 's'   AND t_w_secyear.sale_type = 'w'   AND t_s_firstyear.dyear = 2001   AND t_s_secyear.dyear = 2001+1   AND t_w_firstyear.dyear = 2001   AND t_w_secyear.dyear = 2001+1   AND t_s_firstyear.year_total > 0   AND t_w_firstyear.year_total > 0   AND CASE           WHEN t_w_firstyear.year_total > 0 THEN (t_w_secyear.year_total*1.0000) / t_w_firstyear.year_total           ELSE 0.0       END > CASE                 WHEN t_s_firstyear.year_total > 0 THEN (t_s_secyear.year_total*1.0000) / t_s_firstyear.year_total                 ELSE 0.0             END ORDER BY t_s_secyear.customer_id NULLS FIRST,          t_s_secyear.customer_first_name NULLS FIRST,          t_s_secyear.customer_last_name NULLS FIRST,          t_s_secyear.customer_preferred_cust_flag NULLS FIRST LIMIT 100;
+┌─────────────────────────────────────┐
+│┌───────────────────────────────────┐│
+││         Total Time: 9.97s         ││
+│└───────────────────────────────────┘│
+└─────────────────────────────────────┘
+┌─────────────────┐
+│    QUERY_ROOT   │
+│   ─ ─ ─ ─ ─ ─   │
+│   Cardinality:  │
+│        0        │
+│   ─ ─ ─ ─ ─ ─   │
+│     Timing:     │
+│      0.00s      │
+└────────┬────────┘
+┌────────┴────────┐
+│ EXPLAIN_ANALYZE │
+│   ─ ─ ─ ─ ─ ─   │
+│   Cardinality:  │
+│        0        │
+│   ─ ─ ─ ─ ─ ─   │
+│     Timing:     │
+│      0.00s      │
+└────────┬────────┘
+┌────────┴────────┐
+│      TOP_N      │
+│   ─ ─ ─ ─ ─ ─   │
+│       Top:      │
+│       100       │
+│   ─ ─ ─ ─ ─ ─   │
+│    Order By:    │
+│   t_s_secyear   │
+│ .customer_id ASC│
+│   t_s_secyear   │
+│.customer_first_n│
+│     ame ASC     │
+│   t_s_secyear   │
+│.customer_last_na│
+│      me ASC     │
+│   t_s_secyear   │
+│.customer_preferr│
+│ ed_cust_flag ASC│
+│   ─ ─ ─ ─ ─ ─   │
+│   Cardinality:  │
+│       100       │
+│   ─ ─ ─ ─ ─ ─   │
+│     Timing:     │
+│      0.14s      │
+└────────┬────────┘
+┌────────┴────────┐
+│    PROJECTION   │
+│   ─ ─ ─ ─ ─ ─   │
+│   Projections:  │
+│   customer_id   │
+│customer_first_na│
+│        me       │
+│customer_last_nam│
+│        e        │
+│customer_preferre│
+│   d_cust_flag   │
+│   ─ ─ ─ ─ ─ ─   │
+│    Estimated    │
+│   Cardinality:  │
+│80000000000000000│
+│        0        │
+│   ─ ─ ─ ─ ─ ─   │
+│   Cardinality:  │
+│      167198     │
+│   ─ ─ ─ ─ ─ ─   │
+│     Timing:     │
+│      0.00s      │
+└────────┬────────┘
+┌────────┴────────┐
+│    PROJECTION   │
+│   ─ ─ ─ ─ ─ ─   │
+│   Projections:  │
+│        #1       │
+│        #2       │
+│        #3       │
+│        #5       │
+│   ─ ─ ─ ─ ─ ─   │
+│    Estimated    │
+│   Cardinality:  │
+│80000000000000000│
+│        0        │
+│   ─ ─ ─ ─ ─ ─   │
+│   Cardinality:  │
+│      167198     │
+│   ─ ─ ─ ─ ─ ─   │
+│     Timing:     │
+│      0.00s      │
+└────────┬────────┘
+┌────────┴────────┐
+│    PROJECTION   │
+│   ─ ─ ─ ─ ─ ─   │
+│   Projections:  │
+│        #1       │
+│        #2       │
+│        #3       │
+│        #4       │
+│        #5       │
+│        #6       │
+│        #7       │
+│        #8       │
+│   ─ ─ ─ ─ ─ ─   │
+│    Estimated    │
+│   Cardinality:  │
+│80000000000000000│
+│        0        │
+│   ─ ─ ─ ─ ─ ─   │
+│   Cardinality:  │
+│      167198     │
+│   ─ ─ ─ ─ ─ ─   │
+│     Timing:     │
+│      0.00s      │
+└────────┬────────┘
+┌────────┴────────┐
+│      FILTER     │
+│   ─ ─ ─ ─ ─ ─   │
+│      Name:      │
+│  (CASE  WHEN (  │
+│ (year_total > 0 │
+│   .00)) THEN (  │
+│(CAST((year_total│
+│   * 1.0000) AS  │
+│  DOUBLE) / CAST │
+│  (year_total AS │
+│  DOUBLE))) ELSE │
+│  0.0 END > CASE │
+│ WHEN ((year_tota│
+│ l > 0.00)) THEN │
+│((CAST((year_tota│
+│  l * 1.0000) AS │
+│  DOUBLE) / CAST │
+│  (year_total AS │
+│  DOUBLE))) ELSE │
+│     0.0 END)    │
+│   ─ ─ ─ ─ ─ ─   │
+│    Estimated    │
+│   Cardinality:  │
+│80000000000000000│
+│        0        │
+│   ─ ─ ─ ─ ─ ─   │
+│   Cardinality:  │
+│      167198     │
+│   ─ ─ ─ ─ ─ ─   │
+│     Timing:     │
+│      0.07s      │
+└────────┬────────┘
+┌────────┴────────┐
+│    HASH_JOIN    │
+│   ─ ─ ─ ─ ─ ─   │
+│    Join Type:   │
+│      INNER      │
+│   ─ ─ ─ ─ ─ ─   │
+│   Conditions:   │
+│  customer_id =  │
+│    customer_id  │
+│   ─ ─ ─ ─ ─ ─   │
+│    Estimated    ├───────────────────────────────────────────────┐
+│   Cardinality:  │                                               │
+│80000000000000000│                                               │
+│        0        │                                               │
+│   ─ ─ ─ ─ ─ ─   │                                               │
+│   Cardinality:  │                                               │
+│      335021     │                                               │
+│   ─ ─ ─ ─ ─ ─   │                                               │
+│     Timing:     │                                               │
+│      0.25s      │                                               │
+└────────┬────────┘                                               │
+┌────────┴────────┐                                      ┌────────┴────────┐
+│    PROJECTION   │                                      │    HASH_JOIN    │
+│   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│   Projections:  │                                      │    Join Type:   │
+│   customer_id   │                                      │      INNER      │
+│    year_total   │                                      │   ─ ─ ─ ─ ─ ─   │
+│   ─ ─ ─ ─ ─ ─   │                                      │   Conditions:   │
+│    Estimated    │                                      │  customer_id =  │
+│   Cardinality:  │                                      │    customer_id  │
+│     2000000     │                                      │   ─ ─ ─ ─ ─ ─   │
+│   ─ ─ ─ ─ ─ ─   │                                      │    Estimated    ├───────────────────────────────────────────────┐
+│   Cardinality:  │                                      │   Cardinality:  │                                               │
+│      902229     │                                      │      80000      │                                               │
+│   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │                                               │
+│     Timing:     │                                      │   Cardinality:  │                                               │
+│      0.00s      │                                      │      742224     │                                               │
+│                 │                                      │   ─ ─ ─ ─ ─ ─   │                                               │
+│                 │                                      │     Timing:     │                                               │
+│                 │                                      │      0.27s      │                                               │
+└────────┬────────┘                                      └────────┬────────┘                                               │
+┌────────┴────────┐                                      ┌────────┴────────┐                                      ┌────────┴────────┐
+│  HASH_GROUP_BY  │                                      │    PROJECTION   │                                      │    HASH_JOIN    │
+│   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│     Groups:     │                                      │   Projections:  │                                      │    Join Type:   │
+│        #0       │                                      │   customer_id   │                                      │      INNER      │
+│        #1       │                                      │customer_first_na│                                      │   ─ ─ ─ ─ ─ ─   │
+│        #2       │                                      │        me       │                                      │   Conditions:   │
+│        #3       │                                      │customer_last_nam│                                      │  customer_id =  │
+│        #4       │                                      │        e        │                                      │    customer_id  │
+│        #5       │                                      │customer_preferre│                                      │   ─ ─ ─ ─ ─ ─   │
+│        #6       │                                      │   d_cust_flag   │                                      │    Estimated    │
+│        #7       │                                      │    year_total   │                                      │   Cardinality:  │
+│   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │                                      │      80000      │
+│   Aggregates:   │                                      │    Estimated    │                                      │   ─ ─ ─ ─ ─ ─   ├───────────────────────────────────────────────┐
+│     sum(#8)     │                                      │   Cardinality:  │                                      │   Cardinality:  │                                               │
+│   ─ ─ ─ ─ ─ ─   │                                      │     2000000     │                                      │      816673     │                                               │
+│    Estimated    │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │                                               │
+│   Cardinality:  │                                      │   Cardinality:  │                                      │     Timing:     │                                               │
+│     2000000     │                                      │     1819089     │                                      │      0.24s      │                                               │
+│   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │                                      │                 │                                               │
+│   Cardinality:  │                                      │     Timing:     │                                      │                 │                                               │
+│      902229     │                                      │      0.00s      │                                      │                 │                                               │
+│   ─ ─ ─ ─ ─ ─   │                                      │                 │                                      │                 │                                               │
+│     Timing:     │                                      │                 │                                      │                 │                                               │
+│      8.40s      │                                      │                 │                                      │                 │                                               │
+└────────┬────────┘                                      └────────┬────────┘                                      └────────┬────────┘                                               │
+┌────────┴────────┐                                      ┌────────┴────────┐                                      ┌────────┴────────┐                                      ┌────────┴────────┐
+│    PROJECTION   │                                      │  HASH_GROUP_BY  │                                      │    PROJECTION   │                                      │    PROJECTION   │
+│   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│   Projections:  │                                      │     Groups:     │                                      │   Projections:  │                                      │   Projections:  │
+│  c_customer_id  │                                      │        #0       │                                      │        #0       │                                      │        #0       │
+│   c_first_name  │                                      │        #1       │                                      │        #8       │                                      │        #8       │
+│   c_last_name   │                                      │        #2       │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│c_preferred_cust_│                                      │        #3       │                                      │    Estimated    │                                      │    Estimated    │
+│       flag      │                                      │        #4       │                                      │   Cardinality:  │                                      │   Cardinality:  │
+│ c_birth_country │                                      │        #5       │                                      │      400000     │                                      │      400000     │
+│     c_login     │                                      │        #6       │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│ c_email_address │                                      │        #7       │                                      │   Cardinality:  │                                      │   Cardinality:  │
+│      d_year     │                                      │   ─ ─ ─ ─ ─ ─   │                                      │     1816698     │                                      │      899061     │
+│(ws_ext_list_pric│                                      │   Aggregates:   │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│e - ws_ext_discou│                                      │     sum(#8)     │                                      │     Timing:     │                                      │     Timing:     │
+│     nt_amt)     │                                      │   ─ ─ ─ ─ ─ ─   │                                      │      0.00s      │                                      │      0.00s      │
+│   ─ ─ ─ ─ ─ ─   │                                      │    Estimated    │                                      │                 │                                      │                 │
+│    Estimated    │                                      │   Cardinality:  │                                      │                 │                                      │                 │
+│   Cardinality:  │                                      │     2000000     │                                      │                 │                                      │                 │
+│     14399534    │                                      │   ─ ─ ─ ─ ─ ─   │                                      │                 │                                      │                 │
+│   ─ ─ ─ ─ ─ ─   │                                      │   Cardinality:  │                                      │                 │                                      │                 │
+│   Cardinality:  │                                      │     1819089     │                                      │                 │                                      │                 │
+│     14390934    │                                      │   ─ ─ ─ ─ ─ ─   │                                      │                 │                                      │                 │
+│   ─ ─ ─ ─ ─ ─   │                                      │     Timing:     │                                      │                 │                                      │                 │
+│     Timing:     │                                      │      41.01s     │                                      │                 │                                      │                 │
+│      0.05s      │                                      │                 │                                      │                 │                                      │                 │
+└────────┬────────┘                                      └────────┬────────┘                                      └────────┬────────┘                                      └────────┬────────┘
+┌────────┴────────┐                                      ┌────────┴────────┐                                      ┌────────┴────────┐                                      ┌────────┴────────┐
+│    HASH_JOIN    │                                      │    PROJECTION   │                                      │      FILTER     │                                      │      FILTER     │
+│   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│    Join Type:   │                                      │   Projections:  │                                      │      Name:      │                                      │      Name:      │
+│      INNER      │                                      │  c_customer_id  │                                      │ (year_total > 0 │                                      │ (year_total > 0 │
+│   ─ ─ ─ ─ ─ ─   │                                      │   c_first_name  │                                      │       .00)      │                                      │       .00)      │
+│   Conditions:   │                                      │   c_last_name   │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│ws_bill_customer_│                                      │c_preferred_cust_│                                      │    Estimated    │                                      │    Estimated    │
+│sk = c_customer_s│                                      │       flag      │                                      │   Cardinality:  │                                      │   Cardinality:  │
+│        k        │                                      │ c_birth_country │                                      │      400000     │                                      │      400000     │
+│   ─ ─ ─ ─ ─ ─   │                                      │     c_login     │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│    Estimated    │                                      │ c_email_address │                                      │   Cardinality:  │                                      │   Cardinality:  │
+│   Cardinality:  │                                      │      d_year     │                                      │     1816698     │                                      │      899061     │
+│     14399534    ├────────────────────────────┐         │(ss_ext_list_pric│                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│   ─ ─ ─ ─ ─ ─   │                            │         │e - ss_ext_discou│                                      │     Timing:     │                                      │     Timing:     │
+│   Cardinality:  │                            │         │     nt_amt)     │                                      │      0.01s      │                                      │      0.00s      │
+│     14390934    │                            │         │   ─ ─ ─ ─ ─ ─   │                                      │                 │                                      │                 │
+│   ─ ─ ─ ─ ─ ─   │                            │         │    Estimated    │                                      │                 │                                      │                 │
+│     Timing:     │                            │         │   Cardinality:  │                                      │                 │                                      │                 │
+│      2.11s      │                            │         │     57598123    │                                      │                 │                                      │                 │
+│                 │                            │         │   ─ ─ ─ ─ ─ ─   │                                      │                 │                                      │                 │
+│                 │                            │         │   Cardinality:  │                                      │                 │                                      │                 │
+│                 │                            │         │     53707057    │                                      │                 │                                      │                 │
+│                 │                            │         │   ─ ─ ─ ─ ─ ─   │                                      │                 │                                      │                 │
+│                 │                            │         │     Timing:     │                                      │                 │                                      │                 │
+│                 │                            │         │      0.35s      │                                      │                 │                                      │                 │
+└────────┬────────┘                            │         └────────┬────────┘                                      └────────┬────────┘                                      └────────┬────────┘
+┌────────┴────────┐                   ┌────────┴────────┐┌────────┴────────┐                                      ┌────────┴────────┐                                      ┌────────┴────────┐
+│    HASH_JOIN    │                   │   DELTA_SCAN    ││    HASH_JOIN    │                                      │  HASH_GROUP_BY  │                                      │  HASH_GROUP_BY  │
+│   ─ ─ ─ ─ ─ ─   │                   │   ─ ─ ─ ─ ─ ─   ││   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│    Join Type:   │                   │   Projections:  ││    Join Type:   │                                      │     Groups:     │                                      │     Groups:     │
+│      INNER      │                   │  c_customer_sk  ││      INNER      │                                      │        #0       │                                      │        #0       │
+│   ─ ─ ─ ─ ─ ─   │                   │  c_customer_id  ││   ─ ─ ─ ─ ─ ─   │                                      │        #1       │                                      │        #1       │
+│   Conditions:   │                   │   c_first_name  ││   Conditions:   │                                      │        #2       │                                      │        #2       │
+│ ws_sold_date_sk │                   │   c_last_name   ││ ss_customer_sk =│                                      │        #3       │                                      │        #3       │
+│   = d_date_sk   │                   │c_preferred_cust_││   c_customer_sk │                                      │        #4       │                                      │        #4       │
+│   ─ ─ ─ ─ ─ ─   │                   │       flag      ││   ─ ─ ─ ─ ─ ─   │                                      │        #5       │                                      │        #5       │
+│    Estimated    │                   │ c_birth_country ││    Estimated    │                                      │        #6       │                                      │        #6       │
+│   Cardinality:  │                   │     c_login     ││   Cardinality:  │                                      │        #7       │                                      │        #7       │
+│     14399534    │                   │ c_email_address ││     57598123    │                                      │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│   ─ ─ ─ ─ ─ ─   ├─────────┐         │   ─ ─ ─ ─ ─ ─   ││   ─ ─ ─ ─ ─ ─   ├────────────────────────────┐         │   Aggregates:   │                                      │   Aggregates:   │
+│   Cardinality:  │         │         │    Estimated    ││   Cardinality:  │                            │         │     sum(#8)     │                                      │     sum(#8)     │
+│     14390934    │         │         │   Cardinality:  ││     53707057    │                            │         │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│   ─ ─ ─ ─ ─ ─   │         │         │     2000000     ││   ─ ─ ─ ─ ─ ─   │                            │         │    Estimated    │                                      │    Estimated    │
+│     Timing:     │         │         │   ─ ─ ─ ─ ─ ─   ││     Timing:     │                            │         │   Cardinality:  │                                      │   Cardinality:  │
+│      0.36s      │         │         │   Cardinality:  ││      11.16s     │                            │         │     57598123    │                                      │     14399534    │
+│                 │         │         │     2000000     ││                 │                            │         │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│                 │         │         │   ─ ─ ─ ─ ─ ─   ││                 │                            │         │   Cardinality:  │                                      │   Cardinality:  │
+│                 │         │         │     Timing:     ││                 │                            │         │     1816698     │                                      │      899061     │
+│                 │         │         │      0.43s      ││                 │                            │         │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│                 │         │         │                 ││                 │                            │         │     Timing:     │                                      │     Timing:     │
+│                 │         │         │                 ││                 │                            │         │      37.18s     │                                      │      8.51s      │
+└────────┬────────┘         │         └─────────────────┘└────────┬────────┘                            │         └────────┬────────┘                                      └────────┬────────┘
+┌────────┴────────┐┌────────┴────────┐                   ┌────────┴────────┐                   ┌────────┴────────┐┌────────┴────────┐                                      ┌────────┴────────┐
+│   DELTA_SCAN    ││   DELTA_SCAN    │                   │    HASH_JOIN    │                   │   DELTA_SCAN    ││    PROJECTION   │                                      │    PROJECTION   │
+│   ─ ─ ─ ─ ─ ─   ││   ─ ─ ─ ─ ─ ─   │                   │   ─ ─ ─ ─ ─ ─   │                   │   ─ ─ ─ ─ ─ ─   ││   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│   Projections:  ││   Projections:  │                   │    Join Type:   │                   │   Projections:  ││   Projections:  │                                      │   Projections:  │
+│ ws_sold_date_sk ││    d_date_sk    │                   │      INNER      │                   │  c_customer_sk  ││  c_customer_id  │                                      │  c_customer_id  │
+│ws_bill_customer_││      d_year     │                   │   ─ ─ ─ ─ ─ ─   │                   │  c_customer_id  ││   c_first_name  │                                      │   c_first_name  │
+│        sk       ││   ─ ─ ─ ─ ─ ─   │                   │   Conditions:   │                   │   c_first_name  ││   c_last_name   │                                      │   c_last_name   │
+│ws_ext_discount_a││     Filters:    │                   │ ss_sold_date_sk │                   │   c_last_name   ││c_preferred_cust_│                                      │c_preferred_cust_│
+│        mt       ││ d_year=2002 AND │                   │   = d_date_sk   │                   │c_preferred_cust_││       flag      │                                      │       flag      │
+│ws_ext_list_price││   d_year IS NOT │                   │   ─ ─ ─ ─ ─ ─   │                   │       flag      ││ c_birth_country │                                      │ c_birth_country │
+│   ─ ─ ─ ─ ─ ─   ││       NULL      │                   │    Estimated    │                   │ c_birth_country ││     c_login     │                                      │     c_login     │
+│    Estimated    ││   ─ ─ ─ ─ ─ ─   │                   │   Cardinality:  │                   │     c_login     ││ c_email_address │                                      │ c_email_address │
+│   Cardinality:  ││    Estimated    │                   │     57598123    │                   │ c_email_address ││      d_year     │                                      │      d_year     │
+│     72001613    ││   Cardinality:  │                   │   ─ ─ ─ ─ ─ ─   ├─────────┐         │   ─ ─ ─ ─ ─ ─   ││(ss_ext_list_pric│                                      │(ws_ext_list_pric│
+│   ─ ─ ─ ─ ─ ─   ││      14609      │                   │   Cardinality:  │         │         │    Estimated    ││e - ss_ext_discou│                                      │e - ws_ext_discou│
+│   Cardinality:  ││   ─ ─ ─ ─ ─ ─   │                   │     53707057    │         │         │   Cardinality:  ││     nt_amt)     │                                      │     nt_amt)     │
+│     14390934    ││   Cardinality:  │                   │   ─ ─ ─ ─ ─ ─   │         │         │     2000000     ││   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│   ─ ─ ─ ─ ─ ─   ││       365       │                   │     Timing:     │         │         │   ─ ─ ─ ─ ─ ─   ││    Estimated    │                                      │    Estimated    │
+│     Timing:     ││   ─ ─ ─ ─ ─ ─   │                   │      1.59s      │         │         │   Cardinality:  ││   Cardinality:  │                                      │   Cardinality:  │
+│      2.80s      ││     Timing:     │                   │                 │         │         │     2000000     ││     57598123    │                                      │     14399534    │
+│                 ││      0.00s      │                   │                 │         │         │   ─ ─ ─ ─ ─ ─   ││   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│                 ││                 │                   │                 │         │         │     Timing:     ││   Cardinality:  │                                      │   Cardinality:  │
+│                 ││                 │                   │                 │         │         │      0.60s      ││     53413037    │                                      │     14315555    │
+│                 ││                 │                   │                 │         │         │                 ││   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+│                 ││                 │                   │                 │         │         │                 ││     Timing:     │                                      │     Timing:     │
+│                 ││                 │                   │                 │         │         │                 ││      0.35s      │                                      │      0.07s      │
+└─────────────────┘└─────────────────┘                   └────────┬────────┘         │         └─────────────────┘└────────┬────────┘                                      └────────┬────────┘
+                                                         ┌────────┴────────┐┌────────┴────────┐                   ┌────────┴────────┐                                      ┌────────┴────────┐
+                                                         │   DELTA_SCAN    ││   DELTA_SCAN    │                   │    HASH_JOIN    │                                      │    HASH_JOIN    │
+                                                         │   ─ ─ ─ ─ ─ ─   ││   ─ ─ ─ ─ ─ ─   │                   │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+                                                         │   Projections:  ││   Projections:  │                   │    Join Type:   │                                      │    Join Type:   │
+                                                         │ ss_sold_date_sk ││    d_date_sk    │                   │      INNER      │                                      │      INNER      │
+                                                         │  ss_customer_sk ││      d_year     │                   │   ─ ─ ─ ─ ─ ─   │                                      │   ─ ─ ─ ─ ─ ─   │
+                                                         │ss_ext_discount_a││   ─ ─ ─ ─ ─ ─   │                   │   Conditions:   │                                      │   Conditions:   │
+                                                         │        mt       ││     Filters:    │                   │ ss_customer_sk =│                                      │ws_bill_customer_│
+                                                         │ss_ext_list_price││ d_year=2002 AND │                   │   c_customer_sk │                                      │sk = c_customer_s│
+                                                         │   ─ ─ ─ ─ ─ ─   ││   d_year IS NOT │                   │   ─ ─ ─ ─ ─ ─   │                                      │        k        │
+                                                         │    Estimated    ││       NULL      │                   │    Estimated    │                                      │   ─ ─ ─ ─ ─ ─   │
+                                                         │   Cardinality:  ││   ─ ─ ─ ─ ─ ─   │                   │   Cardinality:  ├────────────────────────────┐         │    Estimated    ├────────────────────────────┐
+                                                         │    288006388    ││    Estimated    │                   │     57598123    │                            │         │   Cardinality:  │                            │
+                                                         │   ─ ─ ─ ─ ─ ─   ││   Cardinality:  │                   │   ─ ─ ─ ─ ─ ─   │                            │         │     14399534    │                            │
+                                                         │   Cardinality:  ││      14609      │                   │   Cardinality:  │                            │         │   ─ ─ ─ ─ ─ ─   │                            │
+                                                         │     53707057    ││   ─ ─ ─ ─ ─ ─   │                   │     53413037    │                            │         │   Cardinality:  │                            │
+                                                         │   ─ ─ ─ ─ ─ ─   ││   Cardinality:  │                   │   ─ ─ ─ ─ ─ ─   │                            │         │     14315555    │                            │
+                                                         │     Timing:     ││       365       │                   │     Timing:     │                            │         │   ─ ─ ─ ─ ─ ─   │                            │
+                                                         │      4.83s      ││   ─ ─ ─ ─ ─ ─   │                   │      10.78s     │                            │         │     Timing:     │                            │
+                                                         │                 ││     Timing:     │                   │                 │                            │         │      2.56s      │                            │
+                                                         │                 ││      0.00s      │                   │                 │                            │         │                 │                            │
+                                                         └─────────────────┘└─────────────────┘                   └────────┬────────┘                            │         └────────┬────────┘                            │
+                                                                                                                  ┌────────┴────────┐                   ┌────────┴────────┐┌────────┴────────┐                   ┌────────┴────────┐
+                                                                                                                  │    HASH_JOIN    │                   │   DELTA_SCAN    ││    HASH_JOIN    │                   │   DELTA_SCAN    │
+                                                                                                                  │   ─ ─ ─ ─ ─ ─   │                   │   ─ ─ ─ ─ ─ ─   ││   ─ ─ ─ ─ ─ ─   │                   │   ─ ─ ─ ─ ─ ─   │
+                                                                                                                  │    Join Type:   │                   │   Projections:  ││    Join Type:   │                   │   Projections:  │
+                                                                                                                  │      INNER      │                   │  c_customer_sk  ││      INNER      │                   │  c_customer_sk  │
+                                                                                                                  │   ─ ─ ─ ─ ─ ─   │                   │  c_customer_id  ││   ─ ─ ─ ─ ─ ─   │                   │  c_customer_id  │
+                                                                                                                  │   Conditions:   │                   │   c_first_name  ││   Conditions:   │                   │   c_first_name  │
+                                                                                                                  │ ss_sold_date_sk │                   │   c_last_name   ││ ws_sold_date_sk │                   │   c_last_name   │
+                                                                                                                  │   = d_date_sk   │                   │c_preferred_cust_││   = d_date_sk   │                   │c_preferred_cust_│
+                                                                                                                  │   ─ ─ ─ ─ ─ ─   │                   │       flag      ││   ─ ─ ─ ─ ─ ─   │                   │       flag      │
+                                                                                                                  │    Estimated    │                   │ c_birth_country ││    Estimated    │                   │ c_birth_country │
+                                                                                                                  │   Cardinality:  │                   │     c_login     ││   Cardinality:  │                   │     c_login     │
+                                                                                                                  │     57598123    ├─────────┐         │ c_email_address ││     14399534    ├─────────┐         │ c_email_address │
+                                                                                                                  │   ─ ─ ─ ─ ─ ─   │         │         │   ─ ─ ─ ─ ─ ─   ││   ─ ─ ─ ─ ─ ─   │         │         │   ─ ─ ─ ─ ─ ─   │
+                                                                                                                  │   Cardinality:  │         │         │    Estimated    ││   Cardinality:  │         │         │    Estimated    │
+                                                                                                                  │     53413037    │         │         │   Cardinality:  ││     14315555    │         │         │   Cardinality:  │
+                                                                                                                  │   ─ ─ ─ ─ ─ ─   │         │         │     2000000     ││   ─ ─ ─ ─ ─ ─   │         │         │     2000000     │
+                                                                                                                  │     Timing:     │         │         │   ─ ─ ─ ─ ─ ─   ││     Timing:     │         │         │   ─ ─ ─ ─ ─ ─   │
+                                                                                                                  │      1.99s      │         │         │   Cardinality:  ││      0.43s      │         │         │   Cardinality:  │
+                                                                                                                  │                 │         │         │     2000000     ││                 │         │         │     2000000     │
+                                                                                                                  │                 │         │         │   ─ ─ ─ ─ ─ ─   ││                 │         │         │   ─ ─ ─ ─ ─ ─   │
+                                                                                                                  │                 │         │         │     Timing:     ││                 │         │         │     Timing:     │
+                                                                                                                  │                 │         │         │      1.41s      ││                 │         │         │      0.52s      │
+                                                                                                                  └────────┬────────┘         │         └─────────────────┘└────────┬────────┘         │         └─────────────────┘
+                                                                                                                  ┌────────┴────────┐┌────────┴────────┐                   ┌────────┴────────┐┌────────┴────────┐
+                                                                                                                  │   DELTA_SCAN    ││   DELTA_SCAN    │                   │   DELTA_SCAN    ││   DELTA_SCAN    │
+                                                                                                                  │   ─ ─ ─ ─ ─ ─   ││   ─ ─ ─ ─ ─ ─   │                   │   ─ ─ ─ ─ ─ ─   ││   ─ ─ ─ ─ ─ ─   │
+                                                                                                                  │   Projections:  ││   Projections:  │                   │   Projections:  ││   Projections:  │
+                                                                                                                  │ ss_sold_date_sk ││    d_date_sk    │                   │ ws_sold_date_sk ││    d_date_sk    │
+                                                                                                                  │  ss_customer_sk ││      d_year     │                   │ws_bill_customer_││      d_year     │
+                                                                                                                  │ss_ext_discount_a││   ─ ─ ─ ─ ─ ─   │                   │        sk       ││   ─ ─ ─ ─ ─ ─   │
+                                                                                                                  │        mt       ││     Filters:    │                   │ws_ext_discount_a││     Filters:    │
+                                                                                                                  │ss_ext_list_price││ d_year=2001 AND │                   │        mt       ││ d_year=2001 AND │
+                                                                                                                  │   ─ ─ ─ ─ ─ ─   ││   d_year IS NOT │                   │ws_ext_list_price││   d_year IS NOT │
+                                                                                                                  │    Estimated    ││       NULL      │                   │   ─ ─ ─ ─ ─ ─   ││       NULL      │
+                                                                                                                  │   Cardinality:  ││   ─ ─ ─ ─ ─ ─   │                   │    Estimated    ││   ─ ─ ─ ─ ─ ─   │
+                                                                                                                  │    288006388    ││    Estimated    │                   │   Cardinality:  ││    Estimated    │
+                                                                                                                  │   ─ ─ ─ ─ ─ ─   ││   Cardinality:  │                   │     72001613    ││   Cardinality:  │
+                                                                                                                  │   Cardinality:  ││      14609      │                   │   ─ ─ ─ ─ ─ ─   ││      14609      │
+                                                                                                                  │     53413037    ││   ─ ─ ─ ─ ─ ─   │                   │   Cardinality:  ││   ─ ─ ─ ─ ─ ─   │
+                                                                                                                  │   ─ ─ ─ ─ ─ ─   ││   Cardinality:  │                   │     14315555    ││   Cardinality:  │
+                                                                                                                  │     Timing:     ││       365       │                   │   ─ ─ ─ ─ ─ ─   ││       365       │
+                                                                                                                  │      4.98s      ││   ─ ─ ─ ─ ─ ─   │                   │     Timing:     ││   ─ ─ ─ ─ ─ ─   │
+                                                                                                                  │                 ││     Timing:     │                   │      1.73s      ││     Timing:     │
+                                                                                                                  │                 ││      0.00s      │                   │                 ││      0.02s      │
+                                                                                                                  └─────────────────┘└─────────────────┘                   └─────────────────┘└─────────────────┘
