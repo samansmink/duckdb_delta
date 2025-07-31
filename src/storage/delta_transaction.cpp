@@ -58,7 +58,7 @@ struct CommitInfo {
     ffi::ArrowFFIData ToArrow(optional_ptr<ClientContext> context) {
         ffi::ArrowFFIData ffi_data;
         unordered_map<idx_t, const shared_ptr<ArrowTypeExtensionData>> extension_types;
-        ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, context);
+        ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, ArrowFormatVersion::V1_0, context);
         ArrowConverter::ToArrowArray(buffer, (ArrowArray*)(&ffi_data.array), props, extension_types);
         ArrowConverter::ToArrowSchema((ArrowSchema*)(&ffi_data.schema), GetTypes(), GetNames(), props);
         return ffi_data;
@@ -88,35 +88,54 @@ struct WriteMetaData {
     };
 
     WriteMetaData() {
-        buffer.Initialize(Allocator::DefaultAllocator(), GetTypes());
+        buffer = make_uniq<DataChunk>();
+        buffer->Initialize(Allocator::DefaultAllocator(), GetTypes());
+    }
+
+    WriteMetaData(DeltaMultiFileList &snapshot, vector<DeltaDataFile> &outstanding_appends) : WriteMetaData() {
+        for (const auto &file : outstanding_appends) {
+            auto table_path = snapshot.GetPaths()[0];
+            auto file_without_double_slash = StringUtil::Replace(file.file_name, "\\", "/");
+            // auto file_split = StringUtil::Split(file, "/");
+            // auto file_name = file_split[file_split.size()-1];
+            auto file_name = file.file_name.substr(table_path.path.size());
+            InsertionOrderPreservingMap<string> partitions = {};
+
+            // TODO: probably horribly wrong
+            for (const auto &part : file.partition_values) {
+                partitions.insert({snapshot.GetPartitionColumns()[part.partition_column_idx], part.partition_value});
+            }
+
+            Append(file_name, Value::MAP(partitions), file.row_count, Timestamp::GetCurrentTimestamp().value, true);
+        }
     }
 
     void Append(const string &path, Value partition_values, idx_t size, idx_t modification_time, bool data_change) {
-        idx_t current_size = buffer.size();
-        idx_t current_capacity = buffer.GetCapacity();
+        idx_t current_size = buffer->size();
+        idx_t current_capacity = buffer->GetCapacity();
 
         if (current_size == current_capacity) {
-            buffer.SetCapacity(2*current_capacity);
+            buffer->SetCapacity(2*current_capacity);
         }
 
-        buffer.SetValue(0, current_size, path);
-        buffer.SetValue(1, current_size, partition_values);
-        buffer.SetValue(2, current_size, Value::BIGINT(size));
-        buffer.SetValue(3, current_size, Value::BIGINT(modification_time));
-        buffer.SetValue(4, current_size, data_change);
-        buffer.SetCardinality(current_size+1);
+        buffer->SetValue(0, current_size, path);
+        buffer->SetValue(1, current_size, partition_values);
+        buffer->SetValue(2, current_size, Value::BIGINT(size));
+        buffer->SetValue(3, current_size, Value::BIGINT(modification_time));
+        buffer->SetValue(4, current_size, data_change);
+        buffer->SetCardinality(current_size+1);
     }
 
     ffi::ArrowFFIData ToArrow(ClientContext &context) {
         ffi::ArrowFFIData ffi_data;
         unordered_map<idx_t, const shared_ptr<ArrowTypeExtensionData>> extension_types;
-        ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, context);
-        ArrowConverter::ToArrowArray(buffer, (ArrowArray*)(&ffi_data.array), props, extension_types);
+        ClientProperties props("UTC", ArrowOffsetSize::REGULAR, false, false, false, ArrowFormatVersion::V1_0, context);
+        ArrowConverter::ToArrowArray(*buffer, (ArrowArray*)(&ffi_data.array), props, extension_types);
         ArrowConverter::ToArrowSchema((ArrowSchema*)(&ffi_data.schema), GetTypes(), GetNames(), props);
         return ffi_data;
     }
 
-    DataChunk buffer;
+    unique_ptr<DataChunk> buffer;
 };
 
 unique_ptr<SchemaVisitor::FieldList> DeltaTransaction::GetWriteSchema(ClientContext &context) {
@@ -136,33 +155,22 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	    if (!outstanding_appends.empty()) {
 	        auto write_context = ffi::get_write_context(kernel_transaction.get());
 	        auto write_path = ffi::get_write_path(write_context, allocate_string);
+
 	        string write_path_string;
 	        if (write_path) {
 	            write_path_string = *(string*)write_path;
 	            delete (string*)write_path;
 	        }
 
-	        WriteMetaData meta_data;
-	        for (const auto &file : outstanding_appends) {
-	            auto table_path = table_entry->snapshot->GetPaths()[0];
-	            auto file_without_double_slash = StringUtil::Replace(file.file_name, "\\", "/");
-	            // auto file_split = StringUtil::Split(file, "/");
-	            // auto file_name = file_split[file_split.size()-1];
-	            auto file_name = file.file_name.substr(table_path.path.size());
-	            InsertionOrderPreservingMap<string> partitions = {};
+	        // Create metadata from the current outstanding appends
+	        WriteMetaData write_metadata(*table_entry->snapshot, outstanding_appends);
+	        // Convert write metadata to ArrowFFI
+	        auto write_metadata_ffi = write_metadata.ToArrow(context);
+            // Convert to Delta Kernel EngineData
+	        KernelEngineData write_metadata_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(write_metadata_ffi.array, &write_metadata_ffi.schema, table_entry->snapshot->extern_engine.get()));
 
-	            // TODO: probably horribly wrong
-	            for (const auto &part : file.partition_values) {
-	                partitions.insert({table_entry->snapshot->GetPartitionColumns()[part.partition_column_idx], part.partition_value});
-	            }
-
-	            meta_data.Append(file_name, Value::MAP(partitions), file.row_count, Timestamp::GetCurrentTimestamp().value, true);
-	        }
-
-	        auto write_metadata_ffi = meta_data.ToArrow(context);
-
-	        KernelEngineData write_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(write_metadata_ffi.array, &write_metadata_ffi.schema, table_entry->snapshot->extern_engine.get()));
-	        ffi::add_files(kernel_transaction.get(), write_info_engine_data.release());
+	        // Add the write data to the commit
+	        ffi::add_files(kernel_transaction.get(), write_metadata_engine_data.release());
 
 	        table_entry->snapshot->TryUnpackKernelResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()));
 	    }

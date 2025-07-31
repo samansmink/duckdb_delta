@@ -16,6 +16,29 @@ from delta_rs_generator import *
 from pyspark_generator import *
 
 ################################################
+### Simple tables for simple tests
+################################################
+
+## really simple
+con = duckdb.connect()
+con.query(f"COPY (SELECT i FROM range(0,10) tbl(i)) TO '{TMP_PATH}/simple_table.parquet'")
+generate_test_data_pyspark(BASE_PATH, 'simple_table', 'simple_table', f'{TMP_PATH}/simple_table.parquet')
+
+## really simple partitioned
+con = duckdb.connect()
+con.query(f"COPY (SELECT i, i%2 as part FROM range(0,10) tbl(i)) TO '{TMP_PATH}/simple_table_partitioned.parquet'")
+generate_test_data_pyspark(BASE_PATH,'simple_table_partitioned', 'simple_table_partitioned', f'{TMP_PATH}/simple_table_partitioned.parquet', partition_column='part')
+
+## really simple column mapped
+## Table with simple evolution: adding a column
+base_query = 'SELECT i, i%2 as part FROM range(0,9) tbl(i);'
+queries = [
+    'ALTER TABLE simple_table_column_mapped ADD COLUMN new_col BIGINT;',
+    'INSERT INTO simple_table_column_mapped VALUES (9, 1, 1337);'
+]
+generate_test_data_pyspark_by_queries(BASE_PATH,'simple_table_column_mapped', 'simple_table_column_mapped', base_query, queries)
+
+################################################
 ### TPC-H
 ################################################
 
@@ -105,26 +128,6 @@ for type in ["bool", "int", "tinyint", "smallint", "bigint", "float", "double", 
 for type in ["int"]:
     query = f"CREATE table test_table as select i::{type}+10 as value1, (i)::{type}+100 as value2, (i)::{type}+1000 as value3, i::{type} as part from range(0,5) tbl(i)"
     generate_test_data_delta_rs(BASE_PATH,f"test_file_skipping_2/{type}", query, "part")
-
-## really simple
-con = duckdb.connect()
-con.query(f"COPY (SELECT i FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple.parquet'")
-generate_test_data_pyspark(BASE_PATH, 'really_simple', 'really_simple', f'{TMP_PATH}/really_simple.parquet')
-
-## really simple partitioned
-con = duckdb.connect()
-con.query(f"COPY (SELECT i, i%2 as part FROM range(0,10) tbl(i)) TO '{TMP_PATH}/really_simple_partitioned.parquet'")
-generate_test_data_pyspark(BASE_PATH,'really_simple_partitioned', 'really_simple_partitioned', f'{TMP_PATH}/really_simple_partitioned.parquet', partition_column='part')
-
-## really simple column mapped
-## Table with simple evolution: adding a column
-base_query = 'SELECT i, i%2 as part FROM range(0,9) tbl(i);'
-queries = [
-    'ALTER TABLE really_simple_column_mapped ADD COLUMN new_col BIGINT;',
-    'INSERT INTO really_simple_column_mapped VALUES (9, 1, 1337);'
-]
-generate_test_data_pyspark_by_queries(BASE_PATH,'really_simple_column_mapped', 'really_simple_column_mapped', base_query, queries)
-
 
 ################################################
 ### Testing specific data types

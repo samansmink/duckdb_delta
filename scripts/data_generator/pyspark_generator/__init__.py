@@ -9,7 +9,7 @@ import shutil
 import math
 import glob
 
-def generate_test_data_pyspark(base_path, name, current_path, input_path, delete_predicate = False):
+def generate_test_data_pyspark(base_path, name, current_path, input_path, delete_predicate = False, partition_column = None):
     """
     generate_test_data_pyspark generates some test data using pyspark and duckdb
 

@@ -772,8 +772,6 @@ unique_ptr<DeltaMultiFileList> DeltaMultiFileList::PushdownInternal(ClientContex
 	filtered_list->names = names;
 	filtered_list->types = types;
 	filtered_list->lazy_loaded_schema = lazy_loaded_schema;
-	filtered_list->partitions = partitions;
-	filtered_list->partition_ids = partition_ids;
 
 	// Copy over the snapshot, this avoids reparsing metadata
 	{
