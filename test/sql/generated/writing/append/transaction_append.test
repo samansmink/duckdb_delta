@@ -100,4 +100,10 @@ COMMIT
 statement error con2
 COMMIT
 ----
-IO Error: DeltaKernel GenericError (5): Generic delta kernel error: commit conflict at version 3
+TransactionContext Error: Failed to commit: DeltaKernel GenericError (5): Generic delta kernel error: commit conflict at version 3
+
+# Data is committed properly
+query II con2
+select count(*), sum(i) FROM simple_table;
+----
+12	55
