@@ -1,5 +1,6 @@
 #pragma once
 
+#define DEFINE_DEFAULT_ENGINE_BASE 1
 #include "delta_kernel_ffi.hpp"
 #include "duckdb/common/enum_util.hpp"
 #include "duckdb/planner/filter/conjunction_filter.hpp"

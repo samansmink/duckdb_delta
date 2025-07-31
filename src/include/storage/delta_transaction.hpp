@@ -39,7 +39,7 @@ public:
 
 	optional_ptr<DeltaTableEntry> GetTableEntry(idx_t version);
 
-	DeltaTableEntry &InitializeTableEntry(ClientContext &context, DeltaSchemaEntry &schema_entry);
+	DeltaTableEntry &InitializeTableEntry(ClientContext &context, DeltaSchemaEntry &schema_entry, idx_t version);
     unique_ptr<SchemaVisitor::FieldList> GetWriteSchema(ClientContext &context);
 
 protected:

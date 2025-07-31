@@ -162,9 +162,9 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	        auto write_metadata_ffi = meta_data.ToArrow(context);
 
 	        KernelEngineData write_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(write_metadata_ffi.array, &write_metadata_ffi.schema, table_entry->snapshot->extern_engine.get()));
-	        ffi::add_write_metadata(kernel_transaction.get(), write_info_engine_data.release());
+	        ffi::add_files(kernel_transaction.get(), write_info_engine_data.release());
 
-	        auto commit_res = table_entry->snapshot->TryUnpackKernelResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()));
+	        table_entry->snapshot->TryUnpackKernelResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()));
 	    }
 	}
 }
@@ -196,7 +196,8 @@ void DeltaTransaction::InitializeTransaction(ClientContext &context) {
     // Convert arrow to Engine Data
     KernelEngineData commit_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(commit_info_arrow.array, &commit_info_arrow.schema, table_entry->snapshot->extern_engine.get()));
 
-    kernel_transaction = ffi::with_commit_info(new_kernel_transaction, commit_info_engine_data.release());
+    string engine_info = "DuckDB";
+    kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::with_engine_info(new_kernel_transaction, KernelUtils::ToDeltaString(engine_info), table_entry->snapshot->extern_engine.get()));
 }
 
 void DeltaTransaction::Append(ClientContext &context, const vector<DeltaDataFile> &append_files) {
