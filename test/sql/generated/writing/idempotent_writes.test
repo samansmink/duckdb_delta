@@ -1,0 +1,71 @@
+# name: test/sql/generated/writing/idempotent_writes.test
+# description: PoC for idempotent write API in DuckDB
+
+require parquet
+
+require delta
+
+#####################################################
+# Initialization
+#####################################################
+
+# Attach some delta table 
+statement ok
+ATTACH './my/delta/table' AS delta_table (TYPE delta); 
+
+#####################################################
+# Running idempotent streaming job
+#####################################################
+
+# Store the current latest version of id `my_app_id`
+statement ok
+SET VARIABLE latest_version = (CALL delta_get_transaction_version('delta_table', 'my_app_id'))
+
+# User now determines how many more batches need to be written. Lets say there are five more.
+foreach batch 3 4 5
+ 
+# We calculate the next batch version
+statement ok
+SET VARIABLE current_batch = getvariable('latest_version') + ${batch}
+ 
+statement ok
+BEGIN TRANSACTION
+
+// TODO: we need to re-check the version of the my_app_id to ensure no other batch was written
+
+# Mark the current delta transaction as 'my_app_id' and 'current_batch'
+statement ok
+CALL delta_set_transaction_id('my_app_id', getvariable('current_batch'));
+
+statement ok
+INSERT INTO dt SELECT * FROM "file_${batch}.parquet"; 
+
+statement ok
+COMMIT
+
+endloop
+
+#####################################################
+# Restarting job
+#####################################################
+# 
+# To restart, the user can simply rerun the above job and get the latest version again to recalculate which batches need to be written 
+# 
+
+#####################################################
+# Cleaner syntax
+#####################################################
+# 
+# Later, we could consider adding nicer syntax. E.g.:
+#
+
+# We could set the TXN_APP_ID on attach 
+statement ok
+ATTACH './my/delta/table' AS delta_table (TYPE delta, DELTA_TXN_APP_ID 'my_app_id');
+
+# I think I would therefore be in favor of this instead, where we require an explicit TRANSACTION statement
+statement ok
+BEGIN TRANSACTION (DELTA_TXN_ID 123)
+INSERT INTO dt SELECT * FROM "a.parquet";
+COMMIT
+
