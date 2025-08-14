@@ -11,6 +11,7 @@
 #include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 
 namespace duckdb {
+class TableFunction;
 
 class DeltaFunctions {
 public:
@@ -25,5 +26,7 @@ private:
 	static ScalarFunctionSet GetExpressionFunction(DatabaseInstance &instance);
 
     static ScalarFunctionSet GetWriteFileFunction(DatabaseInstance &instance);
+
+    static vector<TableFunction> GetTransactionIdempotencyHelpers(DatabaseInstance &instance);
 };
 } // namespace duckdb

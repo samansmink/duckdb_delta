@@ -5,45 +5,48 @@ require parquet
 
 require delta
 
+require-env GENERATED_DATA_AVAILABLE
+
 #####################################################
 # Initialization
 #####################################################
 
 # Attach some delta table 
 statement ok
-ATTACH './my/delta/table' AS delta_table (TYPE delta); 
+ATTACH 'data/generated/simple_table/delta_lake' AS delta_table (TYPE delta); 
 
 #####################################################
-# Running idempotent streaming job
+# Running idempotent streaming job (to be run in a loop
 #####################################################
+
+statement ok
+from delta_table;
 
 # Store the current latest version of id `my_app_id`
+# This is used to calculate which batch to fetch next
 statement ok
-SET VARIABLE latest_version = (CALL delta_get_transaction_version('delta_table', 'my_app_id'))
+SET VARIABLE latest_version = (SELECT version FROM delta_get_transaction_version('delta_table', 'my_app_id'))
 
-# User now determines how many more batches need to be written. Lets say there are five more.
-foreach batch 3 4 5
- 
-# We calculate the next batch version
-statement ok
-SET VARIABLE current_batch = getvariable('latest_version') + ${batch}
- 
 statement ok
 BEGIN TRANSACTION
 
-// TODO: we need to re-check the version of the my_app_id to ensure no other batch was written
-
-# Mark the current delta transaction as 'my_app_id' and 'current_batch'
+# Mark the current delta transaction as 'my_app_id' and 'current_batch' and the expected version is latest_version
 statement ok
-CALL delta_set_transaction_id('my_app_id', getvariable('current_batch'));
+CALL delta_set_transaction_version('my_app_id', getvariable('latest_version')+1::UBIGINT, getvariable('latest_version'));
 
 statement ok
-INSERT INTO dt SELECT * FROM "file_${batch}.parquet"; 
+INSERT INTO delta_table values (getvariable('latest_version')); 
 
+# Commit now needs to basically compare-and-swap on the my_app_id version: on conflicts we need to fail the commit if some other process updated the version before us
 statement ok
 COMMIT
 
-endloop
+mode output_result
+
+statement ok
+FROM delta_table;
+
+mode skip
 
 #####################################################
 # Restarting job
@@ -58,14 +61,30 @@ endloop
 # 
 # Later, we could consider adding nicer syntax. E.g.:
 #
-
-# We could set the TXN_APP_ID on attach 
-statement ok
-ATTACH './my/delta/table' AS delta_table (TYPE delta, DELTA_TXN_APP_ID 'my_app_id');
-
-# I think I would therefore be in favor of this instead, where we require an explicit TRANSACTION statement
-statement ok
-BEGIN TRANSACTION (DELTA_TXN_ID 123)
-INSERT INTO dt SELECT * FROM "a.parquet";
-COMMIT
+# 
+# # We could set the TXN_APP_ID on attach 
+# statement ok
+# ATTACH './my/delta/table' AS delta_table (TYPE delta);
+# 
+# # Application fetches the txnVersion for txnAppId 'my_app_id'
+# # Application calculates two values:
+# # - <expected txnVersion>
+# # - <desired txnVersion>
+# statement ok
+# SELECT version FROM delta_get_transaction_version('delta_table', 'my_app_id')
+# 
+# # Begin a transaction to insert a batch
+# statement ok
+# BEGIN TRANSACTION (DELTA_TXN_APP_ID 'my_app_id', DELTA_TXN_VERSION_NEW <desired txnVersion>, DELTA_TXN_VERSION_OLD <expected txnVersion>)
+# 
+# # Insert some data
+# statement ok
+# INSERT INTO version SELECT 
+# 
+# # on commit conflicts, duckdb will now need to validate that txnAppId is still <expected txnVersion> for for txnAppId 'my_app_id'
+# # we could either:
+# # - fail the commit, let application handle a retry
+# # - quietly rollback the commit and succeed the commit: the idea of idempotency is that the write still succeeded, but somebody else wrote this already.
+# statement ok
+# COMMIT
 

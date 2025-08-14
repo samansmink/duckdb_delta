@@ -10,6 +10,10 @@ vector<TableFunctionSet> DeltaFunctions::GetTableFunctions(DatabaseInstance &ins
 
 	functions.push_back(GetDeltaScanFunction(instance));
 
+    for (const auto &fun : GetTransactionIdempotencyHelpers(instance)) {
+        functions.push_back(TableFunctionSet(fun));
+    }
+
 	return functions;
 }
 
