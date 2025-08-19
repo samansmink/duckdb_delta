@@ -32,6 +32,8 @@ public:
 
     void Append(ClientContext &context, const vector<DeltaDataFile> &append_files);
 
+    void SetTransactionVersion(const string &app_id, idx_t new_version, Value expected_value);
+
 	static DeltaTransaction &Get(ClientContext &context, Catalog &catalog);
 	AccessMode GetAccessMode() const;
 
@@ -64,6 +66,13 @@ private:
     vector<DeltaDataFile> outstanding_appends;
 
     KernelExclusiveTransaction kernel_transaction;
+
+    // Versions registered to this transaction
+    struct TransactionVersion {
+        idx_t new_version;
+        Value expected_version;
+    };
+    unordered_map<string, TransactionVersion> app_versions;
 };
 
 } // namespace duckdb

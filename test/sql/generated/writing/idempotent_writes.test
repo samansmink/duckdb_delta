@@ -7,84 +7,66 @@ require delta
 
 require-env GENERATED_DATA_AVAILABLE
 
+# Copy data
+statement ok
+from copy_dir('data/generated/simple_table', '__TEST_DIR__/idempotent_writes/simple_table');
+
 #####################################################
 # Initialization
 #####################################################
 
 # Attach some delta table 
 statement ok
-ATTACH 'data/generated/simple_table/delta_lake' AS delta_table (TYPE delta); 
-
-#####################################################
-# Running idempotent streaming job (to be run in a loop
-#####################################################
+ATTACH '__TEST_DIR__/idempotent_writes/simple_table/delta_lake' AS delta_table (TYPE delta); 
 
 statement ok
 from delta_table;
 
-# Store the current latest version of id `my_app_id`
-# This is used to calculate which batch to fetch next
+# Create a view to fetch the version
 statement ok
-SET VARIABLE latest_version = (SELECT version FROM delta_get_transaction_version('delta_table', 'my_app_id'))
+CREATE VIEW get_app_version AS SELECT version FROM delta_get_transaction_version('delta_table', 'my_app_id');
+
+# Version is not set yet
+query I
+FROM get_app_version
+----
+NULL
 
 statement ok
 BEGIN TRANSACTION
 
 # Mark the current delta transaction as 'my_app_id' and 'current_batch' and the expected version is latest_version
 statement ok
-CALL delta_set_transaction_version('my_app_id', getvariable('latest_version')+1::UBIGINT, getvariable('latest_version'));
+CALL delta_set_transaction_version('delta_table', 'my_app_id', 1::UBIGINT, NULL::UBIGINT);
 
 statement ok
-INSERT INTO delta_table values (getvariable('latest_version')); 
+INSERT INTO delta_table values (1); 
 
 # Commit now needs to basically compare-and-swap on the my_app_id version: on conflicts we need to fail the commit if some other process updated the version before us
 statement ok
 COMMIT
 
-mode output_result
+# Version is not set yet
+query I
+FROM get_app_version
+----
+1
 
 statement ok
-FROM delta_table;
+BEGIN TRANSACTION
 
-mode skip
+# Mark the current delta transaction as 'my_app_id' and 'current_batch' and the expected version is latest_version
+statement ok
+CALL delta_set_transaction_version('delta_table', 'my_app_id', 1::UBIGINT, NULL::UBIGINT);
 
-#####################################################
-# Restarting job
-#####################################################
-# 
-# To restart, the user can simply rerun the above job and get the latest version again to recalculate which batches need to be written 
-# 
+statement ok
+INSERT INTO delta_table values (1);
 
-#####################################################
-# Cleaner syntax
-#####################################################
-# 
-# Later, we could consider adding nicer syntax. E.g.:
-#
-# 
-# # We could set the TXN_APP_ID on attach 
-# statement ok
-# ATTACH './my/delta/table' AS delta_table (TYPE delta);
-# 
-# # Application fetches the txnVersion for txnAppId 'my_app_id'
-# # Application calculates two values:
-# # - <expected txnVersion>
-# # - <desired txnVersion>
-# statement ok
-# SELECT version FROM delta_get_transaction_version('delta_table', 'my_app_id')
-# 
-# # Begin a transaction to insert a batch
-# statement ok
-# BEGIN TRANSACTION (DELTA_TXN_APP_ID 'my_app_id', DELTA_TXN_VERSION_NEW <desired txnVersion>, DELTA_TXN_VERSION_OLD <expected txnVersion>)
-# 
-# # Insert some data
-# statement ok
-# INSERT INTO version SELECT 
-# 
-# # on commit conflicts, duckdb will now need to validate that txnAppId is still <expected txnVersion> for for txnAppId 'my_app_id'
-# # we could either:
-# # - fail the commit, let application handle a retry
-# # - quietly rollback the commit and succeed the commit: the idea of idempotency is that the write still succeeded, but somebody else wrote this already.
-# statement ok
-# COMMIT
+statement ok
+ABORT
 
+# Version is not changed
+query I
+FROM get_app_version
+----
+1

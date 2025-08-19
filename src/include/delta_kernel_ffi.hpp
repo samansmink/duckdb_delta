@@ -569,6 +569,7 @@ struct im_an_unused_struct_that_tricks_msvc_into_compilation {
     ExternResult<Handle<ExclusiveTransaction>> field13;
     ExternResult<uint64_t> field14;
     ExternResult<NullableCvoid> field15;
+    ExternResult<int64_t> field16;
 };
 
 /// An `Event` can generally be thought of a "log message". It contains all the relevant bits such
@@ -916,6 +917,15 @@ bool string_slice_next(Handle<StringSliceIterator> data,
 ///
 /// Caller is responsible for (at most once) passing a valid pointer to a [`StringSliceIterator`]
 void free_string_slice_data(Handle<StringSliceIterator> data);
+
+ExternResult<Handle<ExclusiveTransaction>> with_transaction_id(Handle<ExclusiveTransaction> txn,
+                                                               KernelStringSlice app_id,
+                                                               int64_t version,
+                                                               Handle<SharedExternEngine> engine);
+
+ExternResult<int64_t> get_app_id_version(Handle<SharedSnapshot> snapshot,
+                                         KernelStringSlice app_id,
+                                         Handle<SharedExternEngine> engine);
 
 /// Get the domain metadata as an optional string allocated by `AllocatedStringFn` for a specific domain in this snapshot
 ///

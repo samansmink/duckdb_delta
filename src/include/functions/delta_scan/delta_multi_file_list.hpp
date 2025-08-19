@@ -103,6 +103,7 @@ public: // TODO: clean up
     }
 
     mutable KernelExternEngine extern_engine;
+    mutable shared_ptr<SharedKernelSnapshot> snapshot;
 
 protected:
 	// Note: Nearly this entire class is mutable because it represents a lazily expanded list of files that is logically
@@ -111,7 +112,6 @@ protected:
 	mutable idx_t version;
 
 	//! Delta Kernel Structures
-	mutable shared_ptr<SharedKernelSnapshot> snapshot;
 
 	mutable KernelScan scan;
 	mutable KernelScanDataIterator scan_data_iterator;

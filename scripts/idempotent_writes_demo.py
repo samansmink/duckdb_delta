@@ -10,24 +10,24 @@ def generate_test_data(scale_factor, num_batches, path):
         con.execute(f"COPY lineitem TO '{path}/{batch_num}/lineitem.parquet'")
 
 # DuckDB Idempotency Primitive 1: get the current transaction version
-def get_delta_transaction_version(delta_path, app_id):
-    current_version = duckdb.query(f"SELECT version FROM delta_get_transaction_version('{delta_path}', '{app_id}');").fetchall()[0][0]
+def get_delta_transaction_version(table, app_id):
+    current_version = duckdb.query(f"SELECT version FROM delta_get_transaction_version('{table}', '{app_id}');").fetchall()[0][0]
     if current_version is None:
         return 0
     return current_version
 
 # DuckDB Idempotency Primitive 2: set the current transaction version to the currently running transaction
-def set_delta_transaction_version(con, app_id, new_version, old_version):
-    con.execute(f"CALL delta_set_transaction_version({app_id}, {new_version}, {old_version});")
+def set_delta_transaction_version(con, table, app_id, new_version, old_version):
+    con.execute(f"CALL delta_set_transaction_version('{table}', '{app_id}', {new_version}, {old_version});")
 
 # This is a basic idempotent stream demo that will write batches found in `input_path`/<batch_num>/lineitem.parquet to `output_delta_path`
-def idempotent_stream_job(input_path, output_delta_path, total_batches, app_id):
+def idempotent_stream_job(input_path, table, total_batches, app_id):
     con = duckdb.connect()
 
     # Loop while there are still batches to process
     while True:
         # Get current version
-        current_version = get_delta_transaction_version(output_delta_path, app_id);
+        current_version = get_delta_transaction_version(table, app_id)
 
         # All batches processed?
         if current_version >= total_batches:
@@ -38,7 +38,7 @@ def idempotent_stream_job(input_path, output_delta_path, total_batches, app_id):
 
         # Initiate the compare-and-swap operation that will be performed on COMMIT: when committing, DuckDB will check
         # that the version of `APP_ID` is still equal to `current_version` and change it to current_version + 1
-        set_delta_transaction_version(con, app_id, 1, current_version + 1, current_version)
+        set_delta_transaction_version(con, table, app_id, 1, current_version + 1, current_version)
 
         # Write the batch to the delta table
         con.execute(f"COPY (FROM '{input_path}/{current_version}/lineitem.parquet') TO '{output_delta_path}'")
