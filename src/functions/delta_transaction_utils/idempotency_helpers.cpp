@@ -1,4 +1,5 @@
 #include "duckdb/execution/expression_executor.hpp"
+#include "duckdb/execution/expression_executor.hpp"
 #include "duckdb/function/scalar_function.hpp"
 #include "duckdb/planner/expression/bound_constant_expression.hpp"
 #include "duckdb/parser/expression/function_expression.hpp"
@@ -51,7 +52,6 @@ static void DeltaGetTransactionVersionFunction(ClientContext &context, TableFunc
 
     int64_t version;
     auto unpacked_version_result = KernelUtils::TryUnpackResult(get_app_id_version_result, version);
-
     if (unpacked_version_result.HasError()) {
         output.SetValue(0,0, Value());
     } else {

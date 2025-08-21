@@ -193,6 +193,28 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	            auto new_version = app_version_info.new_version;
 	            auto expected_version = app_version_info.expected_version;
 
+	            // Verify that the previous version is correct still
+	            auto &snapshot = *table_entry->snapshot;
+                auto kernel_snapshot = snapshot.snapshot->GetLockingRef();
+	            auto app_id_kernel_string = KernelUtils::ToDeltaString(app_id);
+	            auto get_app_id_version_result = ffi::get_app_id_version(kernel_snapshot.GetPtr(), app_id_kernel_string, snapshot.extern_engine.get());
+
+	            int64_t version;
+	            auto unpacked_version_result = KernelUtils::TryUnpackResult(get_app_id_version_result, version);
+	            bool has_error = false;
+	            string error_version;
+	            if (unpacked_version_result.HasError() && !expected_version.IsNull()) {
+	                has_error = true;
+	                error_version = "NULL";
+	            } else if (!unpacked_version_result.HasError() && expected_version.GetValue<idx_t>() != version) {
+	                has_error = true;
+	                error_version = to_string(version);
+	            }
+
+	            if (has_error) {
+	                throw TransactionException("DeltaTransaction version for app_id '%s' did not match the expected previous version of '%s' (found: '%s')", app_id, expected_version.ToString(), error_version);
+	            }
+
 	            kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::with_transaction_id(kernel_transaction.release(), KernelUtils::ToDeltaString(app_id), new_version, table_entry->snapshot->extern_engine.get()));
 	        }
 
