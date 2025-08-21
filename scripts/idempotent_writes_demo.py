@@ -1,75 +1,113 @@
 import duckdb
 import os
+from pathlib import Path
+import shutil
+from decimal import *
+
+PARQUET_OUTPUT_DIR = "/tmp/idempotency_demo_parquet"
+DELTA_OUTPUT_DIR = "/tmp/idempotency_demo_delta"
+APP_ID = 'demo_app_id'
+TABLE_NAME = 'delta_table'
 
 # Generates TPC-H lineitem table as multiple parquet files, creating a batch for each portion of data
 def generate_test_data(scale_factor, num_batches, path):
-    for batch_num in range(0,10):
+    for batch_num in range(1, num_batches+1):
         con = duckdb.connect()
-        con.execute(f"call dbgen(sf={scale_factor}, children={num_batches}, step={batch_num})")
+        con.execute(f"call dbgen(sf={scale_factor}, children={num_batches}, step={batch_num-1})")
         os.makedirs(f"{path}/{batch_num}", exist_ok=True)
         con.execute(f"COPY lineitem TO '{path}/{batch_num}/lineitem.parquet'")
 
-# DuckDB Idempotency Primitive 1: get the current transaction version
-def get_delta_transaction_version(table, app_id):
-    current_version = duckdb.query(f"SELECT version FROM delta_get_transaction_version('{table}', '{app_id}');").fetchall()[0][0]
+def cleanup_data():
+    dirpath = Path(DELTA_OUTPUT_DIR)
+    if dirpath.exists() and dirpath.is_dir():
+        shutil.rmtree(dirpath)
+
+    dirpath = Path(PARQUET_OUTPUT_DIR)
+    if dirpath.exists() and dirpath.is_dir():
+        shutil.rmtree(dirpath)
+
+def setup_duckdb_connection():
+    con = duckdb.connect(config={'allow_unsigned_extensions': 'true'})
+    con.query("LOAD './build/release/extension/delta/delta.duckdb_extension'")
+    con.execute(f"ATTACH '{DELTA_OUTPUT_DIR}' AS {TABLE_NAME} (TYPE delta)");
+    return con
+
+def write_batch(con, batch_to_write, set_new_version = None, current_version = None):
+    con.execute(f"BEGIN TRANSACTION")
+
     if current_version is None:
-        return 0
-    return current_version
+        current_version = 'NULL'
 
-# DuckDB Idempotency Primitive 2: set the current transaction version to the currently running transaction
-def set_delta_transaction_version(con, table, app_id, new_version, old_version):
-    con.execute(f"CALL delta_set_transaction_version('{table}', '{app_id}', {new_version}, {old_version});")
+    # Initiate the compare-and-swap operation that will be performed on COMMIT: when committing, DuckDB will check
+    # that the version of `APP_ID` is still equal to `current_version` and change it to current_version + 1
+    if set_new_version is not None:
+        con.execute(f"CALL delta_set_transaction_version('{TABLE_NAME}', '{APP_ID}', {set_new_version}::UBIGINT, {current_version}::UBIGINT);")
 
-# This is a basic idempotent stream demo that will write batches found in `input_path`/<batch_num>/lineitem.parquet to `output_delta_path`
-def idempotent_stream_job(input_path, table, total_batches, app_id):
-    con = duckdb.connect()
+    # Write the batch to the delta table
+    con.execute(f"INSERT INTO {TABLE_NAME} FROM '{PARQUET_OUTPUT_DIR}/{batch_to_write}/lineitem.parquet'")
 
-    # Loop while there are still batches to process
+    # Commit!
+    con.execute(f"COMMIT")
+
+def process_batches(input_path, max_batch = 0):
+    print(f"Processing batches (max batch: {max_batch})")
+
+    con = setup_duckdb_connection()
+
     while True:
-        # Get current version
-        current_version = get_delta_transaction_version(table, app_id)
+        current_version = con.query(f"SELECT version FROM delta_get_transaction_version('{TABLE_NAME}', '{APP_ID}');").fetchall()[0][0]
 
-        # All batches processed?
-        if current_version >= total_batches:
+        if current_version is not None and current_version >= max_batch:
             break
 
-        # Let's begin processing the batch!
-        con.execute(f"BEGIN TRANSACTION")
+        next_batch = 1 if current_version is None else current_version + 1
 
-        # Initiate the compare-and-swap operation that will be performed on COMMIT: when committing, DuckDB will check
-        # that the version of `APP_ID` is still equal to `current_version` and change it to current_version + 1
-        set_delta_transaction_version(con, table, app_id, 1, current_version + 1, current_version)
+        print(f"- Current version: {current_version}, Processing batch {next_batch} ({input_path}/{next_batch}/lineitem.parquet)")
+        write_batch(con, next_batch, next_batch, current_version)
 
-        # Write the batch to the delta table
-        con.execute(f"COPY (FROM '{input_path}/{current_version}/lineitem.parquet') TO '{output_delta_path}'")
-
-        # Commit!
-        con.execute(f"COMMIT")
+    print()
 
 # Validates the output by checking the result of query 6 from TPC-H on the lineitem table
-def validate_output(delta_dir):
+def validate_output(delta_dir, throw = True):
     con = duckdb.connect()
-    con.execute(f"CREATgE VIEW lineitem AS FROM delta_scan('{delta_dir}');")
+    con.execute(f"CREATE VIEW lineitem AS FROM delta_scan('{delta_dir}');")
     result = con.sql("pragma tpch(6)").fetchall()[0][0];
-    if result != 1193053.2253:
-        raise Exception("Incorrect result!")
+    expected = Decimal('1193053.2253')
+    result_type = type(result)
+    expected_type = type(expected)
+
+    if result != expected:
+        if throw:
+            raise Exception(f"Incorrect result: '{result}' != '{expected}' (types: '{result_type}' and '{expected_type}')")
+        return False
+
+    return True
+
 def main():
-    PARQUET_OUTPUT_DIR = "/tmp/idempotency_demo_parquet"
-    DELTA_OUTPUT_DIR = "/tmp/idempotency_demo_delta"
-    APP_ID = 'demo_app_id'
+    shutil.copytree('data/generated/tpch_sf0/lineitem/delta_lake', DELTA_OUTPUT_DIR)
 
     # Generate Lineitem TPCH SF-0.01 split in 10 batches
     generate_test_data(0.01, 10, PARQUET_OUTPUT_DIR)
 
-    # Will write the first 2 batches
-    idempotent_stream_job(PARQUET_OUTPUT_DIR, DELTA_OUTPUT_DIR, 2, APP_ID)
-    # Will skip batch 0 and 1 and write 3 more batches
-    idempotent_stream_job(PARQUET_OUTPUT_DIR, DELTA_OUTPUT_DIR, 5, APP_ID)
-    # Will skip first 5 batches and write remaining 5
-    idempotent_stream_job(PARQUET_OUTPUT_DIR, DELTA_OUTPUT_DIR, 10, APP_ID)
+    # Will write the first batch
+    process_batches(PARQUET_OUTPUT_DIR, max_batch=1)
+    process_batches(PARQUET_OUTPUT_DIR, max_batch=1)
+    process_batches(PARQUET_OUTPUT_DIR, max_batch=5)
+    process_batches(PARQUET_OUTPUT_DIR, max_batch=9)
+
+    # print(f"Manually writing batch number 10\n")
+    # con = setup_duckdb_connection()
+    # write_batch(con, 10, 10, 9)
+
+    process_batches(PARQUET_OUTPUT_DIR, max_batch=10)
 
     # Validate output
     validate_output(DELTA_OUTPUT_DIR)
 
+    print("success!")
+
 if __name__ == "__main__":
+    cleanup_data()
+
+    # Run main
     main()

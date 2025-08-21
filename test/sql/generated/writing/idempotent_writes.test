@@ -11,10 +11,6 @@ require-env GENERATED_DATA_AVAILABLE
 statement ok
 from copy_dir('data/generated/simple_table', '__TEST_DIR__/idempotent_writes/simple_table');
 
-#####################################################
-# Initialization
-#####################################################
-
 # Attach some delta table 
 statement ok
 ATTACH '__TEST_DIR__/idempotent_writes/simple_table/delta_lake' AS delta_table (TYPE delta); 
@@ -31,6 +27,29 @@ query I
 FROM get_app_version
 ----
 NULL
+
+#####################################################
+# Incorrect expected previous version will throw
+#####################################################
+
+statement ok
+BEGIN TRANSACTION
+
+# Mark the current delta transaction as 'my_app_id' and 'current_batch' and the expected version is latest_version
+statement ok
+CALL delta_set_transaction_version('delta_table', 'my_app_id', 3::UBIGINT, 2::UBIGINT);
+
+statement ok
+INSERT INTO delta_table values (1);
+
+statement error
+COMMIT
+----
+TransactionContext Error: Failed to commit: DeltaTransaction version for app_id 'my_app_id' did not match the expected previous version of '2' (found: 'NULL')
+
+#####################################################
+# Update the version in a transaction
+#####################################################
 
 statement ok
 BEGIN TRANSACTION
@@ -52,6 +71,10 @@ FROM get_app_version
 ----
 1
 
+#####################################################
+# Aborting a transaction will not write version
+#####################################################
+
 statement ok
 BEGIN TRANSACTION
 
@@ -64,6 +87,31 @@ INSERT INTO delta_table values (1);
 
 statement ok
 ABORT
+
+# Version is not changed
+query I
+FROM get_app_version
+----
+1
+
+#####################################################
+# Incorrect expected previous version will throw
+#####################################################
+
+statement ok
+BEGIN TRANSACTION
+
+# Mark the current delta transaction as 'my_app_id' and 'current_batch' and the expected version is latest_version
+statement ok
+CALL delta_set_transaction_version('delta_table', 'my_app_id', 3::UBIGINT, 2::UBIGINT);
+
+statement ok
+INSERT INTO delta_table values (1);
+
+statement error
+COMMIT
+----
+TransactionContext Error: Failed to commit: DeltaTransaction version for app_id 'my_app_id' did not match the expected previous version of '2' (found: '1')
 
 # Version is not changed
 query I
