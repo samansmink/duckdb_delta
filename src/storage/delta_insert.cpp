@@ -38,10 +38,17 @@ DeltaInsert::DeltaInsert(PhysicalPlan &plan, LogicalOperator &op, SchemaCatalogE
 //===--------------------------------------------------------------------===//
 class DeltaInsertGlobalState : public GlobalSinkState {
 public:
-	explicit DeltaInsertGlobalState() = default;
+	explicit DeltaInsertGlobalState(DeltaTableEntry &table) {
+	    for (auto &constraint : table.snapshot->constraints) {
+	        // auto name = table.snapshot->names[constraint->Cast<>()];
+	        // not_null_fields[nam]
+	    }
+	};
     vector<DeltaDataFile> written_files;
 
     idx_t insert_count;
+
+    case_insensitive_set_t not_null_fields;
 };
 
 unique_ptr<GlobalSinkState> DeltaInsert::GetGlobalSinkState(ClientContext &context) const {
@@ -156,6 +163,21 @@ static void AddWrittenFiles(DeltaInsertGlobalState &global_state, DataChunk &chu
 			auto &col_stats = MapValue::GetChildren(struct_children[1]);
 			auto column_names = ParseQuotedList(col_name, '.');
 			auto stats = ParseColumnStats(col_stats);
+
+	        if (stats.has_null_count && stats.null_count > 0) {
+	            // Check Not Null Contraint
+                if (global_state.)
+	        }
+
+	        // TODO: taken from ducklake
+	        // auto &field_id = table.GetFieldId(column_names);
+	        // auto column_stats2 = ParseColumnStats(field_id.Type(), col_stats);
+	        // if (column_stats2.null_count > 0 && column_names.size() == 1) {
+	        //     // we wrote NULL values to a base column - verify NOT NULL constraint
+	        //     if (global_state.not_null_fields.count(column_names[0])) {
+	        //         throw ConstraintException("NOT NULL constraint failed: %s.%s", table.name, column_names[0]);
+	        //     }
+	        // }
 		}
 
 	    // extract the partition info

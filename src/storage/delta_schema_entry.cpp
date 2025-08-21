@@ -111,11 +111,19 @@ unique_ptr<DeltaTableEntry> DeltaSchemaEntry::CreateTableEntry(ClientContext &co
 	vector<string> names;
 	snapshot->Bind(return_types, names);
 
+    // TODO: forward nullability constraints
+
 	CreateTableInfo table_info;
 	for (idx_t i = 0; i < return_types.size(); i++) {
 		table_info.columns.AddColumn(ColumnDefinition(names[i], return_types[i]));
 	}
 	table_info.table = delta_catalog.GetName();
+
+    // Copy over constraints to table info
+    for (const auto& constraint : snapshot->constraints) {
+        table_info.constraints.emplace_back(constraint->Copy());
+    }
+
 	auto table_entry = make_uniq<DeltaTableEntry>(delta_catalog, *this, table_info);
 	table_entry->snapshot = std::move(snapshot);
 

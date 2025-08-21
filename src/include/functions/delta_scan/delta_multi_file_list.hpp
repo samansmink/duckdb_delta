@@ -107,6 +107,9 @@ public: // TODO: clean up
     }
 
     mutable KernelExternEngine extern_engine;
+    vector<unique_ptr<Constraint>> constraints;
+    //! Names
+    vector<string> names;
 
 protected:
 	// Note: Nearly this entire class is mutable because it represents a lazily expanded list of files that is logically
@@ -137,8 +140,7 @@ protected:
 	mutable vector<OpenFileInfo> resolved_files;
 	mutable TableFilterSet table_filters;
 
-	//! Names
-	vector<string> names;
+
 	vector<LogicalType> types;
 
 	bool have_bound = false;

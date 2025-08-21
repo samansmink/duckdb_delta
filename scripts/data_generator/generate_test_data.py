@@ -38,6 +38,11 @@ queries = [
 ]
 generate_test_data_pyspark_by_queries(BASE_PATH,'simple_table_column_mapped', 'simple_table_column_mapped', base_query, queries)
 
+## really simple, non-nullable column
+con = duckdb.connect()
+con.query(f"COPY (SELECT i FROM range(0,10) tbl(i)) TO '{TMP_PATH}/simple_table_non_nullable.parquet'")
+generate_test_data_pyspark(BASE_PATH, 'simple_table_non_nullable', 'simple_table_non_nullable', f'{TMP_PATH}/simple_table_non_nullable.parquet', None, None, ['ALTER TABLE test_table_simple_table_non_nullable ALTER COLUMN i SET NOT NULL;'])
+
 ################################################
 ### TPC-H
 ################################################

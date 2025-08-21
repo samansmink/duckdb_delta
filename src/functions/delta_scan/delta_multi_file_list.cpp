@@ -12,8 +12,12 @@
 #include "duckdb/parser/expression/function_expression.hpp"
 #include "duckdb/planner/table_filter.hpp"
 #include "duckdb/planner/operator/logical_get.hpp"
+#include "duckdb/parser/constraint.hpp"
+#include "duckdb/parser/constraints/not_null_constraint.hpp"
 
 #include <regex>
+
+#include "duckdb/planner/constraints/bound_not_null_constraint.hpp"
 
 namespace duckdb {
 
@@ -508,12 +512,20 @@ void DeltaMultiFileList::Bind(vector<LogicalType> &return_types, vector<string> 
 
 	for (const auto &field : *schema) {
 		names.push_back(field.first);
-		return_types.push_back(field.second);
+		return_types.push_back(field.second.type);
 	}
+
 	// Store the bound names for resolving the complex filter pushdown later
 	have_bound = true;
 	this->names = names;
 	this->types = return_types;
+
+    for (idx_t i = 0; i < schema->size(); i++) {
+        auto &field = (*schema)[i];
+        if (!field.second.nullable) {
+            this->constraints.emplace_back(make_uniq<NotNullConstraint>(LogicalIndex(i)));
+        }
+    }
 }
 
 OpenFileInfo DeltaMultiFileList::GetFileInternal(idx_t i) const {
@@ -647,11 +659,11 @@ static vector<MultiFileColumnDefinition> ConstructGlobalColDefs(const vector<str
 
 	for (idx_t i = 0; i < schema_physical->size(); i++) {
 		physical_names.push_back((*schema_physical)[i].first);
-		physical_types.push_back((*schema_physical)[i].second);
+		physical_types.push_back((*schema_physical)[i].second.type);
 	}
 	for (idx_t i = 0; i < schema_logical->size(); i++) {
 		logical_names.push_back((*schema_logical)[i].first);
-		logical_types.push_back((*schema_logical)[i].second);
+		logical_types.push_back((*schema_logical)[i].second.type);
 	}
 
 	idx_t physical_idx = 0;

@@ -9,7 +9,7 @@ import shutil
 import math
 import glob
 
-def generate_test_data_pyspark(base_path, name, current_path, input_path, delete_predicate = False, partition_column = None):
+def generate_test_data_pyspark(base_path, name, current_path, input_path, delete_predicate = False, partition_column = None, alter_statements = []):
     """
     generate_test_data_pyspark generates some test data using pyspark and duckdb
 
@@ -50,8 +50,10 @@ def generate_test_data_pyspark(base_path, name, current_path, input_path, delete
 
         spark.sql(f"ALTER TABLE test_table_{name} SET TBLPROPERTIES ('delta.minReaderVersion' = '3', 'delta.minWriterVersion' = '7');")
 
+        for alter_statement in alter_statements:
+            spark.sql(alter_statement)
 
-    ## CREATE
+        ## CREATE
         ## CONFIGURE USAGE OF DELETION VECTORS
         if (delete_predicate):
             spark.sql(f"ALTER TABLE test_table_{name} SET TBLPROPERTIES ('delta.enableDeletionVectors' = true);")
