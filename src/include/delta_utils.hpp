@@ -148,10 +148,15 @@ private:
 
 struct MappedDeltaType {
     explicit MappedDeltaType() = delete;
-    MappedDeltaType(LogicalType type, bool nullable) : type(std::move(type)), nullable(nullable) {
+    MappedDeltaType(LogicalType type, bool nullable_p) : type(std::move(type)), nullable(nullable_p) {
     };
+    MappedDeltaType(LogicalType type, bool nullable_p, child_list_t<MappedDeltaType> children_p) : type(std::move(type)), nullable(nullable_p), children(children_p) {
+    };
+
     LogicalType type;
     bool nullable;
+
+    child_list_t<MappedDeltaType> children;
 };
 
 // SchemaVisitor is used to parse the schema of a Delta table from the Kernel
@@ -181,7 +186,7 @@ private:
 	template <LogicalTypeId TypeId>
 	static void VisitSimpleTypeImpl(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
 	                                bool is_nullable, const ffi::CStringMap *metadata) {
-		state->AppendToList(sibling_list_id, name, TypeId, is_nullable);
+		state->AppendToList(sibling_list_id, name, {TypeId, is_nullable});
 	}
 
 	static void VisitDecimal(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
@@ -205,12 +210,11 @@ private:
             struct_children.push_back({"metadata", LogicalType::BLOB});
             type = LogicalType::STRUCT(struct_children);
         }
-
-        state->AppendToList(sibling_list_id, name, std::move(type), is_nullable);
+        state->AppendToList(sibling_list_id, name, {type, is_nullable});
     }
 
 	uintptr_t MakeFieldListImpl(uintptr_t capacity_hint);
-	void AppendToList(uintptr_t id, ffi::KernelStringSlice name, LogicalType &&child, bool nullable);
+	void AppendToList(uintptr_t id, ffi::KernelStringSlice name, MappedDeltaType &&child);
 	unique_ptr<FieldList> TakeFieldList(uintptr_t id);
 };
 

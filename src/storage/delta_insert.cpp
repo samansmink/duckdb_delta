@@ -38,21 +38,24 @@ DeltaInsert::DeltaInsert(PhysicalPlan &plan, LogicalOperator &op, SchemaCatalogE
 //===--------------------------------------------------------------------===//
 class DeltaInsertGlobalState : public GlobalSinkState {
 public:
-	explicit DeltaInsertGlobalState(DeltaTableEntry &table) {
-	    for (auto &constraint : table.snapshot->constraints) {
-	        // auto name = table.snapshot->names[constraint->Cast<>()];
-	        // not_null_fields[nam]
-	    }
+	explicit DeltaInsertGlobalState(const DeltaTableEntry &table) : table_name(table.name), not_null_constraints(table.GetNotNullConstraints()) {
+	    table.ThrowOnUnsupportedFieldForInserting();
 	};
+
+    string table_name;
+
     vector<DeltaDataFile> written_files;
 
     idx_t insert_count;
 
-    case_insensitive_set_t not_null_fields;
+    // Fields in the table with not null constraints. These
+    case_insensitive_map_t<vector<NestedNotNullConstraint>> not_null_constraints;
 };
 
 unique_ptr<GlobalSinkState> DeltaInsert::GetGlobalSinkState(ClientContext &context) const {
-	return make_uniq<DeltaInsertGlobalState>();
+    // TODO: what if table isn't set?
+    const auto &delta_table = table->Cast<DeltaTableEntry>();
+	return make_uniq<DeltaInsertGlobalState>(delta_table);
 }
 
 //===--------------------------------------------------------------------===//
@@ -165,19 +168,21 @@ static void AddWrittenFiles(DeltaInsertGlobalState &global_state, DataChunk &chu
 			auto stats = ParseColumnStats(col_stats);
 
 	        if (stats.has_null_count && stats.null_count > 0) {
-	            // Check Not Null Contraint
-                if (global_state.)
-	        }
+	            auto constraint = global_state.not_null_constraints.find(column_names[0]);
+	            if (constraint != global_state.not_null_constraints.end()) {
+	                // We may have a not null constraint for this col, it's not nested so it
+	                if (column_names.size() == 1) {
+	                    throw ConstraintException("NOT NULL constraint failed: %s.%s", global_state.table_name, column_names[0]);
+	                }
 
-	        // TODO: taken from ducklake
-	        // auto &field_id = table.GetFieldId(column_names);
-	        // auto column_stats2 = ParseColumnStats(field_id.Type(), col_stats);
-	        // if (column_stats2.null_count > 0 && column_names.size() == 1) {
-	        //     // we wrote NULL values to a base column - verify NOT NULL constraint
-	        //     if (global_state.not_null_fields.count(column_names[0])) {
-	        //         throw ConstraintException("NOT NULL constraint failed: %s.%s", table.name, column_names[0]);
-	        //     }
-	        // }
+	                // Check paths
+	                for (auto &constr : constraint->second) {
+	                    if (col_name == constr.path) {
+	                        throw ConstraintException("NOT NULL constraint failed: %s.%s", global_state.table_name, StringUtil::Join(column_names, "."));
+	                    }
+	                }
+	            }
+	        }
 		}
 
 	    // extract the partition info

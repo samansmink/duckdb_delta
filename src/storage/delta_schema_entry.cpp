@@ -119,10 +119,8 @@ unique_ptr<DeltaTableEntry> DeltaSchemaEntry::CreateTableEntry(ClientContext &co
 	}
 	table_info.table = delta_catalog.GetName();
 
-    // Copy over constraints to table info
-    for (const auto& constraint : snapshot->constraints) {
-        table_info.constraints.emplace_back(constraint->Copy());
-    }
+    // Copy over constraints to table info TODO: these are incompatible currently
+    // table_info.constraints = snapshot->not_null_constraints;}
 
 	auto table_entry = make_uniq<DeltaTableEntry>(delta_catalog, *this, table_info);
 	table_entry->snapshot = std::move(snapshot);

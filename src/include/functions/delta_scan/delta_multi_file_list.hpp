@@ -13,6 +13,7 @@
 
 #include "duckdb/common/multi_file/multi_file_reader.hpp"
 #include "duckdb/common/multi_file/multi_file_data.hpp"
+#include "duckdb/parser/constraints/not_null_constraint.hpp"
 
 namespace duckdb {
 
@@ -37,6 +38,16 @@ struct DeltaFileMetaData {
 	case_insensitive_map_t<Value> partition_map;
 
 	unique_ptr<vector<unique_ptr<ParsedExpression>>> transform_expression;
+};
+
+// Constraint only for internal delta extension use
+// Todo: refactor to use duckdb constraint classes, updating the DuckDB side NotNullConstraint
+class NestedNotNullConstraint{
+public:
+    explicit NestedNotNullConstraint(LogicalIndex index_p, string path_p) : index(index_p), path(path_p)  {
+    }
+    LogicalIndex index;
+    string path;
 };
 
 //! The DeltaMultiFileList implements the MultiFileList API to allow injecting it into the regular DuckDB parquet scan
@@ -107,9 +118,11 @@ public: // TODO: clean up
     }
 
     mutable KernelExternEngine extern_engine;
-    vector<unique_ptr<Constraint>> constraints;
+    vector<NestedNotNullConstraint> not_null_constraints;
     //! Names
     vector<string> names;
+
+    bool has_null_constraints_in_arrays = false;
 
 protected:
 	// Note: Nearly this entire class is mutable because it represents a lazily expanded list of files that is logically
