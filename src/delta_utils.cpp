@@ -79,6 +79,9 @@ ffi::EngineExpressionVisitor ExpressionVisitor::CreateVisitor(ExpressionVisitor 
 	visitor.visit_column = VisitColumnExpression;
 	visitor.visit_struct_expr = VisitStructExpression;
 
+    visitor.visit_transform_expr = VisitTransformExpression;
+    visitor.visit_transform_op = VisitTransformOp;
+
 	visitor.visit_literal_struct = VisitStructLiteral;
 
 	visitor.visit_not = VisitNotExpression;
@@ -372,6 +375,9 @@ void ExpressionVisitor::VisitOpaquePredicate(void *data,
 void ExpressionVisitor::VisitUnknown(void *data, uintptr_t sibling_list_id, ffi::KernelStringSlice name) {
     auto state_cast = static_cast<ExpressionVisitor *>(data);
     vector<unique_ptr<ParsedExpression>> children;
+    // TODO:
+    // auto name_str = KernelUtils::FromDeltaString(name);
+    // auto expr_string = StringUtil::Format("delta_kernel_unknown(\"%s\")", name_str);
     unique_ptr<ParsedExpression> expression =
         make_uniq<FunctionExpression>("delta_kernel_unknown", std::move(children), nullptr, nullptr, false, true);
 
@@ -433,6 +439,62 @@ void ExpressionVisitor::VisitStructExpression(void *state, uintptr_t sibling_lis
 
 	unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("struct_pack", std::move(*children_values));
 	state_cast->AppendToList(sibling_list_id, std::move(expression));
+}
+
+void ExpressionVisitor::VisitTransformExpression(void *state, uintptr_t sibling_list_id, uintptr_t input_path_list_id, uintptr_t child_list_id) {
+    auto state_cast = static_cast<ExpressionVisitor *>(state);
+
+    auto children_values = state_cast->TakeFieldList(child_list_id);
+    if (!children_values) {
+        return;
+    }
+
+    if (input_path_list_id) {
+        auto input_path = state_cast->TakeFieldList(input_path_list_id);
+
+        if (input_path->size() != 1) {
+            state_cast->error = ErrorData("Expected exactly one input path for transform expression");
+            return;
+        }
+        children_values->push_back(make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("input_path"), std::move(input_path->front())));
+    }
+
+    unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("delta_kernel_transform_expression", std::move(*children_values));
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
+}
+
+void ExpressionVisitor::VisitTransformOp(void *state, uintptr_t sibling_list_id, bool is_insert, const ffi::KernelStringSlice *field_name, uintptr_t child_list_id) {
+    auto state_cast = static_cast<ExpressionVisitor *>(state);
+
+    unique_ptr<FieldList> children_values;
+
+    if (child_list_id) {
+        children_values = state_cast->TakeFieldList(child_list_id);
+        if (!children_values) {
+            return;
+        }
+    } else {
+        children_values = make_uniq<FieldList>();
+    }
+
+    // Create is_insert_value
+    children_values->push_back(
+                    make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("is_insert"),
+                    make_uniq<ConstantExpression>(Value::BOOLEAN(is_insert))));
+
+
+    // Create field name expr
+    unique_ptr<ParsedExpression> field_name_val;
+    if (field_name) {
+        string field_name_str = KernelUtils::FromDeltaString(*field_name);
+        field_name_val = make_uniq<ConstantExpression>(Value(field_name_str));
+    } else {
+        field_name_val = make_uniq<ConstantExpression>(Value());
+    }
+    children_values->push_back(make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("field_name"), std::move(field_name_val)));
+
+    unique_ptr<ParsedExpression> expression = make_uniq<FunctionExpression>("delta_transform_op", std::move(*children_values));
+    state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
 
 uintptr_t ExpressionVisitor::MakeFieldList(ExpressionVisitor *state, uintptr_t capacity_hint) {
@@ -707,7 +769,7 @@ vector<bool> KernelUtils::FromDeltaBoolSlice(const struct ffi::KernelBoolSlice s
 }
 
 vector<unique_ptr<ParsedExpression>> &
-KernelUtils::UnpackTopLevelStruct(const vector<unique_ptr<ParsedExpression>> &parsed_expression) {
+KernelUtils::UnpackTransformExpression(const vector<unique_ptr<ParsedExpression>> &parsed_expression) {
 	if (parsed_expression.size() != 1) {
 		throw IOException("Unexpected size of transformation expression returned by delta kernel: %d",
 		                  parsed_expression.size());
@@ -718,7 +780,7 @@ KernelUtils::UnpackTopLevelStruct(const vector<unique_ptr<ParsedExpression>> &pa
 		throw IOException("Unexpected type of root expression returned by delta kernel: %d", root_expression->type);
 	}
 
-	if (root_expression->Cast<FunctionExpression>().function_name != "struct_pack") {
+	if (root_expression->Cast<FunctionExpression>().function_name != "delta_kernel_transform_expression") {
 		throw IOException("Unexpected function of root expression returned by delta kernel: %s",
 		                  root_expression->Cast<FunctionExpression>().function_name);
 	}
@@ -804,6 +866,9 @@ uintptr_t PredicateVisitor::VisitConstantFilter(const string &col_name, const Co
 	case LogicalType::BOOLEAN:
 		right = visit_expression_literal_bool(state, BooleanValue::Get(value));
 		break;
+	case LogicalTypeId::DATE:
+	    right = visit_expression_literal_date(state, DateValue::Get(value).days);
+	    break;
 	case LogicalType::VARCHAR: {
 		// WARNING: C++ lifetime extension rules don't protect calls of the form
 		// foo(std::string(...).c_str())
@@ -823,7 +888,6 @@ uintptr_t PredicateVisitor::VisitConstantFilter(const string &col_name, const Co
 	case LogicalTypeId::LIST:
 	case LogicalTypeId::TIMESTAMP:
 	case LogicalTypeId::TIMESTAMP_TZ:
-	case LogicalTypeId::DATE:
 	case LogicalTypeId::DECIMAL:
 	default:
 		break; // unsupported type

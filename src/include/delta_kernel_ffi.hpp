@@ -491,6 +491,9 @@ struct EngineExpressionVisitor {
   /// Visits a `is_null` expression belonging to the list identified by `sibling_list_id`.
   /// The sub-expression will be in a _one_ item list identified by `child_list_id`
   VisitUnaryFn visit_is_null;
+  /// Visits the `ToJson` unary operator belonging to the list identified by `sibling_list_id`.
+  /// The sub-expression will be in a _one_ item list identified by `child_list_id`
+  VisitUnaryFn visit_to_json;
   /// Visits the `LessThan` binary operator belonging to the list identified by `sibling_list_id`.
   /// The operands will be in a _two_ item list identified by `child_list_id`
   VisitBinaryFn visit_lt;
@@ -520,9 +523,41 @@ struct EngineExpressionVisitor {
   VisitBinaryFn visit_divide;
   /// Visits the `column` belonging to the list identified by `sibling_list_id`.
   void (*visit_column)(void *data, uintptr_t sibling_list_id, KernelStringSlice name);
-  /// Visits a `StructExpression` belonging to the list identified by `sibling_list_id`.
-  /// The sub-expressions of the `StructExpression` are in a list identified by `child_list_id`
+  /// Visits a `Struct` expression belonging to the list identified by `sibling_list_id`.
+  /// The sub-expressions (fields) of the struct are in a list identified by `child_list_id`
   void (*visit_struct_expr)(void *data, uintptr_t sibling_list_id, uintptr_t child_list_id);
+  /// Visits a `Transform` expression belonging to the list identified by `sibling_list_id`.
+  /// The `input_path_list_id` identifies the transform's input path (0 = no path).
+  /// The `child_list_id` identifies the transform's operations (0 = identity transform).
+  void (*visit_transform_expr)(void *data,
+                               uintptr_t sibling_list_id,
+                               uintptr_t input_path_list_id,
+                               uintptr_t child_list_id);
+  /// Visits one operation of a `Transform` expression belonging to the list identified by
+  /// `sibling_list_id`. The `field_name` identifies the input field the operation relates to
+  /// (NULL = no field name). The `child_list_id` is a single-item list identifying the
+  /// operation's expression (0 = no expression).
+  ///
+  /// The operations of a transform are modeled as `(is_insert, field_name, expr)` triples. The
+  /// field name always references a field of the input struct. Both the field name and the
+  /// expression are optional, with valid combinations given by the following truth table:
+  ///
+  /// |is_insert? |field_name? |expr? |meaning|
+  /// |-|-|-|-|
+  /// | NO  | NO  |  *  | INVALID - replacements always require a field name
+  /// | NO  | YES | NO  | Drop the named input field (it has no replacement)
+  /// | NO  | YES | YES | Replace the named field with the expr
+  /// | YES |  *  | NO  | INVALID - insertions always require an expression
+  /// | YES | NO  | YES | Insert the expression just before the first input field
+  /// | YES | YES | YES | Insert the expression after the the named input field
+  ///
+  /// NOTE: Insertion order is significant -- if multiple insertions reference the same input
+  /// field, they should be inserted as a group, in the order given, at the insertion point.
+  void (*visit_transform_op)(void *data,
+                             uintptr_t sibling_list_id,
+                             bool is_insert,
+                             const KernelStringSlice *field_name,
+                             uintptr_t child_list_id);
   /// Visits the operator (`op`) and children (`child_list_id`) of an opaque expression belonging
   /// to the list identified by `sibling_list_id`.
   void (*visit_opaque_expr)(void *data,
@@ -1163,6 +1198,9 @@ uintptr_t visit_expression_literal_float(KernelExpressionVisitorState *state, fl
 uintptr_t visit_expression_literal_double(KernelExpressionVisitorState *state, double value);
 
 uintptr_t visit_expression_literal_bool(KernelExpressionVisitorState *state, bool value);
+
+/// visit a date literal expression 'value' (i32 representing days since unix epoch)
+uintptr_t visit_expression_literal_date(KernelExpressionVisitorState *state, int32_t value);
 
 /// Enable getting called back for tracing (logging) events in the kernel. `max_level` specifies
 /// that only events `<=` to the specified level should be reported.  More verbose Levels are "greater

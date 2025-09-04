@@ -340,14 +340,70 @@ static void KernelPartitionStringVisitor(ffi::NullableCvoid engine_context, ffi:
 	data->partitions.push_back(KernelUtils::FromDeltaString(slice));
 }
 
-static Value GetPartitionValueFromExpression(const vector<unique_ptr<ParsedExpression>> &parsed_expression,
-                                             idx_t index) {
-	auto &column_expressions = KernelUtils::UnpackTopLevelStruct(parsed_expression);
-	auto &child = column_expressions[index];
-	if (!child || child->type != ExpressionType::VALUE_CONSTANT) {
-		throw IOException("Failed to parse partition value from kernel-provided transformation");
-	}
-	return child->Cast<ConstantExpression>().value;
+static unordered_map<idx_t, Value> FindPartitionValues(ParsedExpression &transformation, const vector<string> &names) {
+    if (transformation.Cast<FunctionExpression>().function_name != "delta_kernel_transform_expression") {
+        throw IOException("Unexpected function of root expression returned by delta kernel: %s", transformation.Cast<FunctionExpression>().function_name);
+    }
+
+    unordered_map<idx_t, Value> res;
+
+    idx_t no_key_id = 0;
+    unordered_map<string, idx_t> inserted_key_ids;
+
+    // Iterate the children of the transform
+    for (auto & child: transformation.Cast<FunctionExpression>().children) {
+        auto &transform_op = child->Cast<FunctionExpression>();
+        if (transform_op.function_name != "delta_transform_op") {
+            throw IOException("Unexpected function for delta_transform_op returned by delta kernel: %s", child->Cast<FunctionExpression>().function_name);
+        }
+
+        bool is_insert = false;
+        string field_name;
+        vector<Value> values;
+
+        for (auto &transform_op_child : transform_op.children) {
+            if (transform_op_child->GetExpressionType() == ExpressionType::COMPARE_EQUAL) {
+                auto name = transform_op_child->Cast<ComparisonExpression>().left->Cast<ColumnRefExpression>().GetName();
+                auto value = transform_op_child->Cast<ComparisonExpression>().right->Cast<ConstantExpression>().value;
+
+                if (name == "is_insert") {
+                    is_insert = value.GetValue<bool>();
+                } else if (name == "field_name") {
+                    if (!value.IsNull()) {
+                        field_name = value.ToString();
+                    }
+                } else {
+                    throw InternalException("Unexpected name for delta_transform_op returned by delta kernel: %s", name);
+                }
+            } else if (transform_op_child->GetExpressionType() == ExpressionType::VALUE_CONSTANT) {
+                values.push_back(transform_op_child->Cast<ConstantExpression>().value);
+            } else {
+                throw NotImplementedException("Unexpected expression for delta_transform_op returned by delta kernel: %s", transform_op_child->ToString());
+            }
+        }
+
+        if (values.size() != 1) {
+            throw InternalException("Unexpected number of values for delta_transform_op returned by delta kernel: %d", values.size());
+        }
+
+        if (is_insert) {
+            // Inserts without field_name are inserted at index 0, 1... in the order they occur in the transform expression
+            if (field_name.empty()) {
+                res[no_key_id++] = values[0];
+            } else {
+                // Inserts with a field name are injected at index i+1, i+2.. where i is the index of the field name
+                // TODO: this is broken for multiple cols i believe
+                for (idx_t i = 0; i < names.size(); ++i) {
+                    if (field_name == names[i]) {
+                        res[i+1] = values[0];
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    return res;
 }
 
 void ScanDataCallBack::VisitCallbackInternal(ffi::NullableCvoid engine_context, ffi::KernelStringSlice path,
@@ -410,14 +466,20 @@ void ScanDataCallBack::VisitCallbackInternal(ffi::NullableCvoid engine_context, 
 			                           "Failed to parse transformation expression from delta kernel: null returned");
 			return;
 		}
+	    if (parsed_transformation_expression->size() != 1 || parsed_transformation_expression->front()->GetExpressionType() != ExpressionType::FUNCTION) {
+	        context->error = ErrorData(ExceptionType::IO,
+                                       "Failed to fetch partitions from delta kernel transform: Transform is unknown expression");
+	        return;
+	    }
+
+	    auto transform_partitions = FindPartitionValues(*(*parsed_transformation_expression)[0], snapshot.names);
 
 		case_insensitive_map_t<Value> constant_map;
 		for (idx_t i = 0; i < snapshot.partitions.size(); ++i) {
 			const auto &partition_id = context->snapshot.partition_ids[i];
 			const auto &partition_name = context->snapshot.partitions[i];
 
-			constant_map[partition_name] =
-			    GetPartitionValueFromExpression(*parsed_transformation_expression, partition_id);
+			constant_map[partition_name] = transform_partitions[partition_id];
 		}
 		snapshot.metadata.back()->partition_map = std::move(constant_map);
 		snapshot.metadata.back()->transform_expression =

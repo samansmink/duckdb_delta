@@ -46,10 +46,3 @@ SELECT file_row_number, filename.substring(-8,8), b, a from delta_scan('./data/g
 0	.parquet	NULL	value1
 0	.parquet	NULL	value3
 0	.parquet	5	value4
-
-# Todo remove when we run all test
-query III nosort res1
-from delta_scan('./data/inlined/timestamp_ntz-id-mode/delta') ORDER BY id
-
-query III nosort res1
-from parquet_scan('./data/inlined/timestamp_ntz-id-mode/expected/**/*.parquet') ORDER BY id
