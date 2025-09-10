@@ -80,7 +80,7 @@ ffi::EngineExpressionVisitor ExpressionVisitor::CreateVisitor(ExpressionVisitor 
 	visitor.visit_struct_expr = VisitStructExpression;
 
     visitor.visit_transform_expr = VisitTransformExpression;
-    visitor.visit_transform_op = VisitTransformOp;
+    visitor.visit_field_transform = VisitFieldTransform;
 
 	visitor.visit_literal_struct = VisitStructLiteral;
 
@@ -463,13 +463,13 @@ void ExpressionVisitor::VisitTransformExpression(void *state, uintptr_t sibling_
     state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
 
-void ExpressionVisitor::VisitTransformOp(void *state, uintptr_t sibling_list_id, bool is_insert, const ffi::KernelStringSlice *field_name, uintptr_t child_list_id) {
+void ExpressionVisitor::VisitFieldTransform(void *state, uintptr_t sibling_list_id, const ffi::KernelStringSlice *field_name, uintptr_t expr_list_id, bool is_replace) {
     auto state_cast = static_cast<ExpressionVisitor *>(state);
 
     unique_ptr<FieldList> children_values;
 
-    if (child_list_id) {
-        children_values = state_cast->TakeFieldList(child_list_id);
+    if (expr_list_id) {
+        children_values = state_cast->TakeFieldList(expr_list_id);
         if (!children_values) {
             return;
         }
@@ -479,8 +479,8 @@ void ExpressionVisitor::VisitTransformOp(void *state, uintptr_t sibling_list_id,
 
     // Create is_insert_value
     children_values->push_back(
-                    make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("is_insert"),
-                    make_uniq<ConstantExpression>(Value::BOOLEAN(is_insert))));
+                    make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("is_replace"),
+                    make_uniq<ConstantExpression>(Value::BOOLEAN(is_replace))));
 
 
     // Create field name expr

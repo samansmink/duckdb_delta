@@ -526,38 +526,45 @@ struct EngineExpressionVisitor {
   /// Visits a `Struct` expression belonging to the list identified by `sibling_list_id`.
   /// The sub-expressions (fields) of the struct are in a list identified by `child_list_id`
   void (*visit_struct_expr)(void *data, uintptr_t sibling_list_id, uintptr_t child_list_id);
-  /// Visits a `Transform` expression belonging to the list identified by `sibling_list_id`.
-  /// The `input_path_list_id` identifies the transform's input path (0 = no path).
-  /// The `child_list_id` identifies the transform's operations (0 = identity transform).
+  /// Visits a `Transform` expression belonging to the list identified by `sibling_list_id`. The
+  /// `input_path_list_id` is a single-item list containing transform's input path as a column
+  /// reference (0 = no path). The `field_transform_list_id` identifies the list of field
+  /// transforms to apply (0 = identity transform). See also [`Self::visit_field_transform`].
   void (*visit_transform_expr)(void *data,
                                uintptr_t sibling_list_id,
                                uintptr_t input_path_list_id,
-                               uintptr_t child_list_id);
-  /// Visits one operation of a `Transform` expression belonging to the list identified by
-  /// `sibling_list_id`. The `field_name` identifies the input field the operation relates to
-  /// (NULL = no field name). The `child_list_id` is a single-item list identifying the
-  /// operation's expression (0 = no expression).
+                               uintptr_t field_transform_list_id);
+  /// Visits one field transform of a `Transform` expression that owns the list identified by
+  /// `sibling_list_id`. Each field transform has a different insertion point (no duplicates).
   ///
-  /// The operations of a transform are modeled as `(is_insert, field_name, expr)` triples. The
-  /// field name always references a field of the input struct. Both the field name and the
-  /// expression are optional, with valid combinations given by the following truth table:
+  /// A field transform is modeled as the triple `(field_name, expr_list, is_replace)`, as
+  /// described by the truth table below. The `expr_list_id` identifies the list of expressions
+  /// the field transform should emit. The field name (if present) always references a field of
+  /// the input struct. Both the field name and the expression list are optional:
   ///
-  /// |is_insert? |field_name? |expr? |meaning|
+  /// |field_name? |expr_list? |is_replace? |meaning|
   /// |-|-|-|-|
-  /// | NO  | NO  |  *  | INVALID - replacements always require a field name
-  /// | NO  | YES | NO  | Drop the named input field (it has no replacement)
-  /// | NO  | YES | YES | Replace the named field with the expr
-  /// | YES |  *  | NO  | INVALID - insertions always require an expression
-  /// | YES | NO  | YES | Insert the expression just before the first input field
-  /// | YES | YES | YES | Insert the expression after the the named input field
+  /// | NO  | NO  | *   | NO-OP (prepend an empty list of expressions to the output)
+  /// | NO  | YES | *   | Prepend a list of expressions to the output
+  /// | YES | NO  | NO  | NO-OP (insert an empty list of expressions after the named input field)
+  /// | YES | NO  | YES | Drop the named input field
+  /// | YES | YES | NO  | Insert a list of expressions after the named input field
+  /// | YES | YES | YES | Replace the named input field with a list of expressions
   ///
-  /// NOTE: Insertion order is significant -- if multiple insertions reference the same input
-  /// field, they should be inserted as a group, in the order given, at the insertion point.
-  void (*visit_transform_op)(void *data,
-                             uintptr_t sibling_list_id,
-                             bool is_insert,
-                             const KernelStringSlice *field_name,
-                             uintptr_t child_list_id);
+  /// NOTE: Treating list id 0 as an empty list yields a simplified truth table:
+  ///
+  /// |field_name? |is_replace? |meaning|
+  /// |-|-|-|
+  /// | NO  | *   | Prepend a (possibly empty) list of expressions to the output
+  /// | YES | NO  | Insert a (possibly empty)  list of expressions after the named input field
+  /// | YES | YES | Replace the named input field with a (possibly empty) list of expressions
+  ///
+  /// NOTE: The expressions of each field transform must be emitted in order at the insertion point.
+  void (*visit_field_transform)(void *data,
+                                uintptr_t sibling_list_id,
+                                const KernelStringSlice *field_name,
+                                uintptr_t expr_list_id,
+                                bool is_replace);
   /// Visits the operator (`op`) and children (`child_list_id`) of an opaque expression belonging
   /// to the list identified by `sibling_list_id`.
   void (*visit_opaque_expr)(void *data,

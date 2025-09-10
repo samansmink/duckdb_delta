@@ -347,9 +347,6 @@ static unordered_map<idx_t, Value> FindPartitionValues(ParsedExpression &transfo
 
     unordered_map<idx_t, Value> res;
 
-    idx_t no_key_id = 0;
-    unordered_map<string, idx_t> inserted_key_ids;
-
     // Iterate the children of the transform
     for (auto & child: transformation.Cast<FunctionExpression>().children) {
         auto &transform_op = child->Cast<FunctionExpression>();
@@ -357,7 +354,7 @@ static unordered_map<idx_t, Value> FindPartitionValues(ParsedExpression &transfo
             throw IOException("Unexpected function for delta_transform_op returned by delta kernel: %s", child->Cast<FunctionExpression>().function_name);
         }
 
-        bool is_insert = false;
+        bool is_replace = false;
         string field_name;
         vector<Value> values;
 
@@ -366,8 +363,8 @@ static unordered_map<idx_t, Value> FindPartitionValues(ParsedExpression &transfo
                 auto name = transform_op_child->Cast<ComparisonExpression>().left->Cast<ColumnRefExpression>().GetName();
                 auto value = transform_op_child->Cast<ComparisonExpression>().right->Cast<ConstantExpression>().value;
 
-                if (name == "is_insert") {
-                    is_insert = value.GetValue<bool>();
+                if (name == "is_replace") {
+                    is_replace = value.GetValue<bool>();
                 } else if (name == "field_name") {
                     if (!value.IsNull()) {
                         field_name = value.ToString();
@@ -382,24 +379,26 @@ static unordered_map<idx_t, Value> FindPartitionValues(ParsedExpression &transfo
             }
         }
 
-        if (values.size() != 1) {
-            throw InternalException("Unexpected number of values for delta_transform_op returned by delta kernel: %d", values.size());
-        }
-
-        if (is_insert) {
-            // Inserts without field_name are inserted at index 0, 1... in the order they occur in the transform expression
-            if (field_name.empty()) {
-                res[no_key_id++] = values[0];
-            } else {
-                // Inserts with a field name are injected at index i+1, i+2.. where i is the index of the field name
-                // TODO: this is broken for multiple cols i believe
-                for (idx_t i = 0; i < names.size(); ++i) {
-                    if (field_name == names[i]) {
-                        res[i+1] = values[0];
-                        break;
-                    }
+        /// NOTE: Treating list id 0 as an empty list yields a simplified truth table:
+        ///
+        /// |field_name? |is_replace? |meaning|
+        /// |-|-|-|
+        /// | NO  | *   | Prepend a (possibly empty) list of expressions to the output
+        /// | YES | NO  | Insert a (possibly empty)  list of expressions after the named input field
+        /// | YES | YES | Replace the named input field with a (possibly empty) list of expressions
+        // TODO: broken for multiple transform expressions?
+        idx_t index_to_insert = 0;
+        if (!field_name.empty()) {
+            for (idx_t i = 0; i < names.size(); ++i) {
+                if (field_name == names[i]) {
+                    index_to_insert = is_replace ? i : i+1;
+                    break;
                 }
             }
+        }
+
+        for (idx_t i = 0; i < values.size(); ++i) {
+            res[index_to_insert + i] = values[i];
         }
     }
 

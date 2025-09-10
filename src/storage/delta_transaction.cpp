@@ -76,6 +76,7 @@ struct WriteMetaData {
             LogicalType::BIGINT,
             LogicalType::BIGINT,
             LogicalType::BOOLEAN,
+            LogicalType::BIGINT,
         };
     };
     static vector<string> GetNames() {
@@ -84,7 +85,8 @@ struct WriteMetaData {
             "partitionValues",
             "size",
             "modificationTime",
-            "dataChange"
+            "dataChange",
+            "numRecords"
         };
     };
 
@@ -124,6 +126,7 @@ struct WriteMetaData {
         buffer->SetValue(2, current_size, Value::BIGINT(size));
         buffer->SetValue(3, current_size, Value::BIGINT(modification_time));
         buffer->SetValue(4, current_size, data_change);
+        buffer->SetValue(5, current_size, Value::BIGINT(size)); // TODO ???
         buffer->SetCardinality(current_size+1);
     }
 

@@ -72,7 +72,7 @@ private:
 	static void VisitColumnExpression(void *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name);
 	static void VisitStructExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
     static void VisitTransformExpression(void *data,uintptr_t sibling_list_id, uintptr_t input_path_list_id, uintptr_t child_list_id);
-    static void VisitTransformOp(void *state, uintptr_t sibling_list_id, bool is_insert, const ffi::KernelStringSlice *field_name, uintptr_t child_list_id);
+    static void VisitFieldTransform(void *data, uintptr_t sibling_list_id, const ffi::KernelStringSlice *field_name, uintptr_t expr_list_id, bool is_replace);
 	static void VisitNotExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
 	static void VisitIsNullExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id);
 	static void VisitLiteralMap(void *data, uintptr_t sibling_list_id, uintptr_t key_list_id, uintptr_t value_list_id);
