@@ -1,5 +1,5 @@
-# name: test/sql/golden_tests/positive_tests.test
-# description: golden tables that need to be read successfully
+# name: test/sql/golden_tests/generated.test
+# description: generated generated golden table tests
 # group: [delta_kernel_rs]
 
 require parquet
@@ -9,6 +9,26 @@ require delta
 require-env GOLDEN_TABLES_PATH
 
 # WARNING: this file is generated automatically, do not edit manually (see scripts/generate_golden_table_tests.py)
+
+######## table-with-columnmapping-mode-name ########
+
+query T rowsort res-table-with-columnmapping-mode-name
+from delta_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-name/delta')
+
+query T rowsort table-with-columnmapping-mode-name
+from parquet_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-name/expected/**/*.parquet')
+
+
+mode skip
+
+
+######## table-with-columnmapping-mode-id ########
+
+query T rowsort res-table-with-columnmapping-mode-id
+from delta_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-id/delta')
+
+query T rowsort table-with-columnmapping-mode-id
+from parquet_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-id/expected/**/*.parquet')
 
 ######## 124-decimal-decode-bug ########
 
@@ -489,6 +509,22 @@ from delta_scan('${GOLDEN_TABLES_PATH}/v2-checkpoint-parquet/delta')
 
 query T rowsort v2-checkpoint-parquet
 from parquet_scan('${GOLDEN_TABLES_PATH}/v2-checkpoint-parquet/expected/**/*.parquet')
+
+######## basic-decimal-table ########
+
+query T rowsort res-basic-decimal-table
+from delta_scan('${GOLDEN_TABLES_PATH}/basic-decimal-table/delta')
+
+query T rowsort basic-decimal-table
+from parquet_scan('${GOLDEN_TABLES_PATH}/basic-decimal-table/expected/**/*.parquet')
+
+######## basic-decimal-table-legacy ########
+
+query T rowsort res-basic-decimal-table-legacy
+from delta_scan('${GOLDEN_TABLES_PATH}/basic-decimal-table-legacy/delta')
+
+query T rowsort basic-decimal-table-legacy
+from parquet_scan('${GOLDEN_TABLES_PATH}/basic-decimal-table-legacy/expected/**/*.parquet')
 
 ######## deltalog-invalid-protocol-version ########
 

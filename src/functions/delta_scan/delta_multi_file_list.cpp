@@ -659,31 +659,56 @@ void DeltaMultiFileList::InitializeSnapshot() const {
 	initialized_snapshot = true;
 }
 
-static void InjectColumnIdentifiers(const vector<string> &names, const vector<LogicalType> &types,
-                                    const vector<string> &all_names, const vector<LogicalType> &all_types,
+// This method injects the correct column mapping identifiers int the global_column_defs based on a list of local_names, physical names and physical types
+// Basically we have two things:
+// - logical schema
+// - phyisical schema
+// And we need to inject the identifiers of columns and fields in the global_column_defs
+// NOTE: ColumnMapping by name only!
+static void InjectColumnIdentifiers(const vector<string> &logical_names,
+                                    const vector<string> &physical_names, const vector<LogicalType> &physical_types,
                                     vector<MultiFileColumnDefinition> &global_column_defs) {
-	for (idx_t i = 0; i < names.size(); i++) {
+	for (idx_t i = 0; i < logical_names.size(); i++) {
 		auto &col = global_column_defs[i];
 		col.default_expression = make_uniq<ConstantExpression>(Value(col.type));
-		col.identifier = Value(all_names[i]);
+		col.identifier = Value(physical_names[i]);
 
 		if (col.type.id() == LogicalTypeId::STRUCT) {
-			vector<string> child_names;
-			vector<LogicalType> child_types;
+			vector<string> child_logical_names;
 			for (idx_t j = 0; j < StructType::GetChildCount(col.type); j++) {
-				child_names.emplace_back(StructType::GetChildName(col.type, j));
-				child_types.emplace_back(StructType::GetChildType(col.type, j));
+				child_logical_names.emplace_back(StructType::GetChildName(col.type, j));
 			}
 
-			vector<string> child_all_names;
-			vector<LogicalType> child_all_types;
-			for (idx_t j = 0; j < StructType::GetChildCount(all_types[i]); j++) {
-				child_all_names.emplace_back(StructType::GetChildName(all_types[i], j));
-				child_all_types.emplace_back(StructType::GetChildType(all_types[i], j));
+			vector<string> child_physical_names;
+			vector<LogicalType> child_physical_types;
+			for (idx_t j = 0; j < StructType::GetChildCount(physical_types[i]); j++) {
+				child_physical_names.emplace_back(StructType::GetChildName(physical_types[i], j));
+				child_physical_types.emplace_back(StructType::GetChildType(physical_types[i], j));
 			}
 
-			InjectColumnIdentifiers(child_names, child_types, child_all_names, child_all_types, col.children);
+			InjectColumnIdentifiers(child_logical_names, child_physical_names, child_physical_types, col.children);
 		}
+
+	    if (col.type.id() == LogicalTypeId::LIST) {
+	        auto child_type = ListType::GetChildType(col.type);
+	        vector<string> child_logical_names = {"element"};
+	        vector<string> child_physical_names = {"element"};
+	        vector<LogicalType> child_physical_types = {ListType::GetChildType(physical_types[i])};
+
+	        InjectColumnIdentifiers(child_logical_names, child_physical_names, child_physical_types, col.children);
+	    }
+
+	    if (col.type.id() == LogicalTypeId::MAP) {
+            auto key_type = MapType::KeyType(col.type);
+            auto value_type = MapType::ValueType(col.type);
+            vector<string> child_logical_names = {"key", "value"};
+            vector<string> child_physical_names = {"key", "value"};
+            vector<LogicalType> child_physical_types = {
+                MapType::KeyType(physical_types[i]), MapType::ValueType(physical_types[i])
+            };
+
+            InjectColumnIdentifiers(child_logical_names, child_physical_names, child_physical_types, col.children);
+        }
 	}
 }
 
@@ -729,25 +754,26 @@ static vector<MultiFileColumnDefinition> ConstructGlobalColDefs(const vector<str
 		physical_idx++;
 	}
 
-	vector<string> all_names;
-	vector<LogicalType> all_types;
+    // TODO: whats the difference between all_physical_names and physical_names?
+	vector<string> all_physical_names;
+	vector<LogicalType> all_physical_types;
 	for (idx_t i = 0; i < names.size(); i++) {
 		auto &name = names[i];
 		auto &type = types[i];
 
 		auto lu = name_map.find(name);
 		if (lu != name_map.end()) {
-			all_names.push_back(lu->second);
-			all_types.push_back(physical_type_map[name]);
+			all_physical_names.push_back(lu->second);
+			all_physical_types.push_back(physical_type_map[name]);
 		} else {
-			all_names.push_back(name);
-			all_types.push_back(type);
+			all_physical_names.push_back(name);
+			all_physical_types.push_back(type);
 		}
 	}
 
 	auto global_column_defs = MultiFileColumnDefinition::ColumnsFromNamesAndTypes(names, types);
 
-	InjectColumnIdentifiers(names, types, all_names, all_types, global_column_defs);
+    InjectColumnIdentifiers(names, all_physical_names, all_physical_types, global_column_defs);
 
 	return global_column_defs;
 }

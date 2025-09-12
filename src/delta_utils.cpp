@@ -384,29 +384,13 @@ void ExpressionVisitor::VisitUnknown(void *data, uintptr_t sibling_list_id, ffi:
     state_cast->AppendToList(sibling_list_id, std::move(expression));
 }
 
-// This function is a workaround for the fact that duckdb disallows using hugeints to store decimals with precision < 18
-// whereas kernel does allow this.
-static int64_t GetTruncatedDecimalValue(int64_t value_ms, uint64_t value_ls) {
-	// First trim msb from lower half
-	auto new_value_ls = value_ls << 1;
-	new_value_ls = new_value_ls >> 1;
-
-	// Now cast the lower half to signed
-	auto lower_cast = UnsafeNumericCast<int64_t>(value_ls);
-
-	// If value_ms was negative, we need to invert
-	if (value_ms < 0) {
-		lower_cast = -lower_cast;
-	}
-	return lower_cast;
-}
-
 void ExpressionVisitor::VisitDecimalLiteral(void *state, uintptr_t sibling_list_id, int64_t value_ms, uint64_t value_ls,
                                             uint8_t precision, uint8_t scale) {
 	try {
 		Value decimal_value;
 		if (precision < Decimal::MAX_WIDTH_INT64) {
-			decimal_value = Value::DECIMAL(GetTruncatedDecimalValue(value_ms, value_ls), precision, scale);
+		    auto cast = Value::HUGEINT({value_ms, value_ls}).DefaultCastAs(LogicalType::BIGINT);
+			decimal_value = Value::DECIMAL(cast.GetValue<int64_t>(), precision, scale);
 		} else {
 			decimal_value = Value::DECIMAL({value_ms, value_ls}, precision, scale);
 		}
@@ -623,8 +607,20 @@ unique_ptr<SchemaVisitor::FieldList> SchemaVisitor::VisitWriteContextSchema(ffi:
 	return visitor_state.TakeFieldList(result);
 }
 
+static void *allocate_string(const struct ffi::KernelStringSlice slice) {
+    return new string(slice.ptr, slice.len);
+}
+//
 void SchemaVisitor::VisitDecimal(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
                                  bool is_nullable, const ffi::CStringMap *metadata, uint8_t precision, uint8_t scale) {
+
+    string key = "parquet.field.id";
+    auto res = ffi::get_from_string_map(metadata, KernelUtils::ToDeltaString(key), allocate_string);
+    string col_id;
+    if (res) {
+         col_id = *(string*)res;
+    }
+
 	state->AppendToList(sibling_list_id, name, LogicalType::DECIMAL(precision, scale));
 }
 
