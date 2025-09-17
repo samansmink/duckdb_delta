@@ -30,6 +30,7 @@ jobs:
       save_cache: ${{ github.event_name != 'pull_request' }}
       vcpkg_binary_sources: ${{ github.event_name != 'pull_request' && vars.VCPKG_BINARY_SOURCES || '' }}
 
+      override_ci_tools_repository: samansmink/extension-ci-tools
       reduced_ci_mode: true
 
 
