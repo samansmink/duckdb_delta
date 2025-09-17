@@ -19,7 +19,7 @@ jobs:
     with:
       # Main config
       duckdb_version: 51bbf8224c # latest main as of now
-      ci_tools_version: main
+      ci_tools_version: 22c4d0570f3abe93d00c6db8f3d23285313c3a45
       extension_name: delta
       enable_rust: true
       rust_logs: true
