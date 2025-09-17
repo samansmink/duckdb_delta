@@ -14,12 +14,12 @@ concurrency:
 jobs:
   duckdb-stable-build:
     name: Build extension binaries
-    uses: samansmink/extension-ci-tools/.github/workflows/_extension_distribution.yml@fb66f88007250ec87d73a0d5c8339b3fce1a3a54
+    uses: samansmink/extension-ci-tools/.github/workflows/_extension_distribution.yml@82cbcda963da2be6d483d01774e6c6f0801d2490
     secrets: inherit # required for writing to vcpkg binary cache
     with:
       # Main config
       duckdb_version: 51bbf8224c # latest main as of now
-      ci_tools_version: fb66f88007250ec87d73a0d5c8339b3fce1a3a54
+      ci_tools_version: 82cbcda963da2be6d483d01774e6c6f0801d2490
       extension_name: delta
       enable_rust: true
       rust_logs: true
@@ -32,19 +32,19 @@ jobs:
 
 
       override_ci_tools_repository: samansmink/extension-ci-tools
-#      reduced_ci_mode: true
+      reduced_ci_mode: true
 
 
   duckdb-stable-deploy:
     name: Deploy extension binaries
     needs: duckdb-stable-build
-    uses: samansmink/extension-ci-tools/.github/workflows/_extension_deploy.yml@fb66f88007250ec87d73a0d5c8339b3fce1a3a54
+    uses: samansmink/extension-ci-tools/.github/workflows/_extension_deploy.yml@82cbcda963da2be6d483d01774e6c6f0801d2490
     secrets: inherit
     with:
       extension_name: delta
       duckdb_version: 51bbf8224c # latest main as of now
-      ci_tools_version: fb66f88007250ec87d73a0d5c8339b3fce1a3a54
+      ci_tools_version: 82cbcda963da2be6d483d01774e6c6f0801d2490
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;windows_amd64_rtools;windows_amd64_mingw;'
       deploy_latest: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
       override_ci_tools_repository: samansmink/extension-ci-tools
-#      reduced_ci_mode: true
+      reduced_ci_mode: true
