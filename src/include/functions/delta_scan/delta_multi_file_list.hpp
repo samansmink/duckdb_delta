@@ -137,9 +137,8 @@ protected:
 	mutable vector<OpenFileInfo> resolved_files;
 	mutable TableFilterSet table_filters;
 
-	//! Names
-	vector<string> names;
-	vector<LogicalType> types;
+	//! Global schema: NOTE: this might be missing some sht
+    vector<MultiFileColumnDefinition> global_columns;
 
 	bool have_bound = false;
 

@@ -56,8 +56,8 @@ def write_base_tests():
 
 
     result += generate_golden_test("table-with-columnmapping-mode-name", "latest_snapshot_test")
-    result += "\n\nmode skip\n\n"
     result += generate_golden_test("table-with-columnmapping-mode-id", "latest_snapshot_test")
+    result += "\n\nmode skip\n\n"
 
 
     result += generate_golden_test("124-decimal-decode-bug", "latest_snapshot_test")
