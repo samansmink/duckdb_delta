@@ -22,8 +22,7 @@ jobs:
       ci_tools_version: fb66f88007250ec87d73a0d5c8339b3fce1a3a54
       extension_name: delta
       enable_rust: true
-      rust_logs: true
-      q'
+      rust_logs: trueg
 
       # Config to write vcpkg binary cache
       extra_toolchains: ${{ github.event_name != 'pull_request' && ';downgraded_aws_cli;python3;' || 'python3' }}
