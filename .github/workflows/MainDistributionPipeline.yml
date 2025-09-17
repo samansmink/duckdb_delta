@@ -14,7 +14,7 @@ concurrency:
 jobs:
   duckdb-stable-build:
     name: Build extension binaries
-    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@main
+    uses: samansmink/extension-ci-tools/.github/workflows/_extension_distribution.yml@22c4d0570f3abe93d00c6db8f3d23285313c3a45
     secrets: inherit # required for writing to vcpkg binary cache
     with:
       # Main config
@@ -29,6 +29,8 @@ jobs:
       extra_toolchains: ${{ github.event_name != 'pull_request' && ';downgraded_aws_cli;python3;' || 'python3' }}
       save_cache: ${{ github.event_name != 'pull_request' }}
       vcpkg_binary_sources: ${{ github.event_name != 'pull_request' && vars.VCPKG_BINARY_SOURCES || '' }}
+
+      reduced_ci_mode: true
 
 
   duckdb-stable-deploy:
