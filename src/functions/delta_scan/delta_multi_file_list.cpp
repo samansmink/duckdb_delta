@@ -344,7 +344,7 @@ static void KernelPartitionStringVisitor(ffi::NullableCvoid engine_context, ffi:
 	data->partitions.push_back(KernelUtils::FromDeltaString(slice));
 }
 
-static unordered_map<idx_t, Value> FindPartitionValues(ParsedExpression &transformation, const vector<MultiFileColumnDefinition> &cols) {
+static unordered_map<idx_t, Value> FindPartitionValues(ParsedExpression &transformation, const vector<DeltaMultiFileColumnDefinition> &cols) {
     if (transformation.Cast<FunctionExpression>().function_name != "delta_kernel_transform_expression") {
         throw IOException("Unexpected function of root expression returned by delta kernel: %s", transformation.Cast<FunctionExpression>().function_name);
     }
@@ -555,39 +555,39 @@ string DeltaMultiFileList::ToDeltaPath(const string &raw_path) {
 }
 
 static void ExtractNotNullConstraints(vector<NestedNotNullConstraint> &constraints,
-                               const SchemaVisitor::FieldList &schema, idx_t index = DConstants::INVALID_INDEX, const string &parent_path = "") {
+                               const vector<DeltaMultiFileColumnDefinition> &columns, idx_t index = DConstants::INVALID_INDEX, const string &parent_path = "") {
 
     idx_t col_id = 0;
-    for (auto &field : schema) {
+    for (auto &col : columns) {
         // Traverse struct
-        string field_path = parent_path.empty() ? "\"" + field.first + "\"" : parent_path + ".\"" + field.first + "\"";
+        string field_path = parent_path.empty() ? "\"" + col.name + "\"" : parent_path + ".\"" + col.name + "\"";
         idx_t index_to_set = index == DConstants::INVALID_INDEX ? col_id++ : index;
 
-        if (!field.second.nullable) {
+        if (!col.nullable) {
             constraints.push_back(NestedNotNullConstraint(LogicalIndex(index_to_set), field_path));
         }
 
-        if (field.second.type.id() == LogicalTypeId::STRUCT) {
-            ExtractNotNullConstraints(constraints, field.second.children, index_to_set, field_path);
+        if (col.type.id() == LogicalTypeId::STRUCT) {
+            ExtractNotNullConstraints(constraints, col.children, index_to_set, field_path);
         }
     }
 }
 
-static bool ExtractHasNullConstraintsInArrays(SchemaVisitor::FieldList &fields, bool in_array = false) {
-    for (auto &field : fields) {
-        if (field.second.type.id() == LogicalTypeId::ARRAY || field.second.type.id() == LogicalTypeId::LIST) {
-            if (!field.second.nullable) {
+static bool ExtractHasNullConstraintsInArrays(const vector<DeltaMultiFileColumnDefinition> &columns, bool in_array = false) {
+    for (auto &col : columns) {
+        if (col.type.id() == LogicalTypeId::ARRAY || col.type.id() == LogicalTypeId::LIST) {
+            if (!col.nullable) {
                 return true;
             }
         }
 
         // Traverse nested types
-        if (field.second.type.id() == LogicalTypeId::STRUCT ||
-            field.second.type.id() == LogicalTypeId::MAP ||
-            field.second.type.id() == LogicalTypeId::LIST ||
-            field.second.type.id() == LogicalTypeId::ARRAY) {
+        if (col.type.id() == LogicalTypeId::STRUCT ||
+            col.type.id() == LogicalTypeId::MAP ||
+            col.type.id() == LogicalTypeId::LIST ||
+            col.type.id() == LogicalTypeId::ARRAY) {
 
-            if (ExtractHasNullConstraintsInArrays(field.second.children, true)) {
+            if (ExtractHasNullConstraintsInArrays(col.children, true)) {
                 return true;
             }
         }
@@ -609,7 +609,7 @@ void DeltaMultiFileList::Bind(vector<LogicalType> &return_types, vector<string> 
 
 	EnsureSnapshotInitialized();
 
-	vector<MultiFileColumnDefinition> visited_schema;
+	vector<DeltaMultiFileColumnDefinition> visited_schema;
 	{
 		auto snapshot_ref = snapshot->GetLockingRef();
 		visited_schema = SchemaVisitor::VisitSnapshotSchema(snapshot_ref.GetPtr(), enable_variant);
@@ -623,11 +623,11 @@ void DeltaMultiFileList::Bind(vector<LogicalType> &return_types, vector<string> 
 	// Store the bound names for resolving the complex filter pushdown later
 	have_bound = true;
 
-    this->global_columns = std::move(visited_schema);
-
     ExtractNotNullConstraints(this->not_null_constraints, visited_schema);
 
     has_null_constraints_in_arrays = ExtractHasNullConstraintsInArrays(visited_schema);
+
+    this->global_columns = std::move(visited_schema);
 }
 
 OpenFileInfo DeltaMultiFileList::GetFileInternal(idx_t i) const {
@@ -1057,7 +1057,7 @@ vector<string> DeltaMultiFileList::GetPartitionColumns() {
 	return partitions;
 }
 
-vector<MultiFileColumnDefinition> &DeltaMultiFileList::GetLazyLoadedGlobalColumns() const {
+vector<DeltaMultiFileColumnDefinition> &DeltaMultiFileList::GetLazyLoadedGlobalColumns() const {
 	unique_lock<mutex> lck(lock);
 	EnsureScanInitialized();
 	return lazy_loaded_schema;

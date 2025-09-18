@@ -12,24 +12,23 @@ require-env GOLDEN_TABLES_PATH
 
 ######## table-with-columnmapping-mode-name ########
 
-statement ok
-pragma threads=1
+query T rowsort res-table-with-columnmapping-mode-name
+from delta_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-name/delta')
 
 query T rowsort table-with-columnmapping-mode-name
-select map_of_arrays from delta_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-name/delta')
-
-query T rowsort table-with-columnmapping-mode-name
-select map_of_arrays from parquet_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-name/expected/**/*.parquet')
+from parquet_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-name/expected/**/*.parquet')
 
 ######## table-with-columnmapping-mode-id ########
 
 query T rowsort res-table-with-columnmapping-mode-id
-SELECT nested_struct from delta_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-id/delta')
+from delta_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-id/delta')
 
 query T rowsort table-with-columnmapping-mode-id
-select nested_struct from parquet_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-id/expected/**/*.parquet')
+from parquet_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-id/expected/**/*.parquet')
+
 
 mode skip
+
 
 ######## 124-decimal-decode-bug ########
 

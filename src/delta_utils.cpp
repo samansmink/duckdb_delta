@@ -556,7 +556,7 @@ ffi::EngineSchemaVisitor SchemaVisitor::CreateSchemaVisitor(SchemaVisitor &state
 	return visitor;
 }
 
-vector<MultiFileColumnDefinition> SchemaVisitor::VisitSnapshotSchema(ffi::SharedSnapshot *snapshot, bool enable_variant) {
+vector<DeltaMultiFileColumnDefinition> SchemaVisitor::VisitSnapshotSchema(ffi::SharedSnapshot *snapshot, bool enable_variant) {
 	SchemaVisitor state;
 	auto visitor = CreateSchemaVisitor(state, enable_variant);
 
@@ -571,7 +571,7 @@ vector<MultiFileColumnDefinition> SchemaVisitor::VisitSnapshotSchema(ffi::Shared
 	return state.TakeFieldList(result);
 }
 
-vector<MultiFileColumnDefinition> SchemaVisitor::VisitSnapshotGlobalReadSchema(ffi::SharedScan *scan,
+vector<DeltaMultiFileColumnDefinition> SchemaVisitor::VisitSnapshotGlobalReadSchema(ffi::SharedScan *scan,
                                                                                   bool logical, bool enable_variant) {
 	SchemaVisitor visitor_state;
 	auto visitor = CreateSchemaVisitor(visitor_state, enable_variant);
@@ -593,7 +593,7 @@ vector<MultiFileColumnDefinition> SchemaVisitor::VisitSnapshotGlobalReadSchema(f
 	return visitor_state.TakeFieldList(result);
 }
 
-vector<MultiFileColumnDefinition> SchemaVisitor::VisitWriteContextSchema(ffi::SharedWriteContext *write_context, bool enable_variant) {
+vector<DeltaMultiFileColumnDefinition> SchemaVisitor::VisitWriteContextSchema(ffi::SharedWriteContext *write_context, bool enable_variant) {
 	SchemaVisitor visitor_state;
 	auto visitor = CreateSchemaVisitor(visitor_state, enable_variant);
     auto schema = ffi::get_write_schema(write_context);
@@ -607,11 +607,10 @@ vector<MultiFileColumnDefinition> SchemaVisitor::VisitWriteContextSchema(ffi::Sh
 	return visitor_state.TakeFieldList(result);
 }
 
-//
 void SchemaVisitor::VisitDecimal(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
                                  bool is_nullable, const ffi::CStringMap *metadata, uint8_t precision, uint8_t scale) {
     auto decimal_type = LogicalType::DECIMAL(precision, scale);
-    MultiFileColumnDefinition decimal_def(KernelUtils::FromDeltaString(name), decimal_type);
+    DeltaMultiFileColumnDefinition decimal_def(KernelUtils::FromDeltaString(name), decimal_type, is_nullable);
     decimal_def.default_expression = make_uniq<ConstantExpression>(Value().DefaultCastAs(decimal_type));
 
     ApplyDeltaColumnMapping(metadata, decimal_def);
@@ -633,7 +632,7 @@ void SchemaVisitor::VisitStruct(SchemaVisitor *state, uintptr_t sibling_list_id,
     }
 
     auto struct_type = LogicalType::STRUCT(children_types);
-    MultiFileColumnDefinition struct_def(KernelUtils::FromDeltaString(name), struct_type);
+    DeltaMultiFileColumnDefinition struct_def(KernelUtils::FromDeltaString(name), struct_type, is_nullable);
     struct_def.children = std::move(children);
     struct_def.default_expression = make_uniq<ConstantExpression>(Value(struct_type));
 
@@ -650,7 +649,7 @@ void SchemaVisitor::VisitArray(SchemaVisitor *state, uintptr_t sibling_list_id, 
 
     auto list_type = LogicalType::LIST(children.front().type);
 
-    MultiFileColumnDefinition list_def(KernelUtils::FromDeltaString(name), list_type);
+    DeltaMultiFileColumnDefinition list_def(KernelUtils::FromDeltaString(name), list_type, is_nullable);
     list_def.children.push_back(std::move(children.front()));
     list_def.default_expression = make_uniq<ConstantExpression>(Value(list_type));
 
@@ -671,7 +670,7 @@ void SchemaVisitor::VisitMap(SchemaVisitor *state, uintptr_t sibling_list_id, ff
     value.name = "value";
 
     auto map_type = LogicalType::MAP(key.type, value.type);
-    MultiFileColumnDefinition map_def(KernelUtils::FromDeltaString(name), map_type);
+    DeltaMultiFileColumnDefinition map_def(KernelUtils::FromDeltaString(name), map_type, is_nullable);
     map_def.children.push_back(std::move(key));
     map_def.children.push_back(std::move(value));
 
@@ -684,7 +683,7 @@ void SchemaVisitor::VisitMap(SchemaVisitor *state, uintptr_t sibling_list_id, ff
 
 uintptr_t SchemaVisitor::MakeFieldListImpl(uintptr_t capacity_hint) {
 	uintptr_t id = next_id++;
-	auto list = vector<MultiFileColumnDefinition>();;
+	auto list = vector<DeltaMultiFileColumnDefinition>();;
 	if (capacity_hint > 0) {
 		list.reserve(capacity_hint);
 	}
@@ -692,7 +691,7 @@ uintptr_t SchemaVisitor::MakeFieldListImpl(uintptr_t capacity_hint) {
 	return id;
 }
 
-void SchemaVisitor::AppendToList(uintptr_t id, ffi::KernelStringSlice name, MultiFileColumnDefinition &&child) {
+void SchemaVisitor::AppendToList(uintptr_t id, ffi::KernelStringSlice name, DeltaMultiFileColumnDefinition &&child) {
 	auto it = inflight_lists.find(id);
 	if (it == inflight_lists.end()) {
 		error = ErrorData(ExceptionType::INTERNAL, "Unhandled error in SchemaVisitor::AppendToList");
@@ -705,11 +704,11 @@ void SchemaVisitor::AppendToList(uintptr_t id, ffi::KernelStringSlice name, Mult
 	it->second.emplace_back(std::move(child));
 }
 
-vector<MultiFileColumnDefinition> SchemaVisitor::TakeFieldList(uintptr_t id) {
+vector<DeltaMultiFileColumnDefinition> SchemaVisitor::TakeFieldList(uintptr_t id) {
 	auto it = inflight_lists.find(id);
 	if (it == inflight_lists.end()) {
 		error = ErrorData(ExceptionType::INTERNAL, "Unhandled error in SchemaVisitor::TakeFieldList");
-		return vector<MultiFileColumnDefinition>();
+		return vector<DeltaMultiFileColumnDefinition>();
 	}
 	auto rval = std::move(it->second);
 	inflight_lists.erase(it);
@@ -830,7 +829,7 @@ KernelUtils::UnpackTransformExpression(const vector<unique_ptr<ParsedExpression>
 	return root_expression->Cast<FunctionExpression>().children;
 }
 
-PredicateVisitor::PredicateVisitor(const vector<MultiFileColumnDefinition> &columns, optional_ptr<const TableFilterSet> filters) {
+PredicateVisitor::PredicateVisitor(const vector<DeltaMultiFileColumnDefinition> &columns, optional_ptr<const TableFilterSet> filters) {
 	predicate = this;
 	visitor = (uintptr_t(*)(void *, ffi::KernelExpressionVisitorState *)) & VisitPredicate;
 

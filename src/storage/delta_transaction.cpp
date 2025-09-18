@@ -142,7 +142,7 @@ struct WriteMetaData {
     unique_ptr<DataChunk> buffer;
 };
 
-vector<MultiFileColumnDefinition> DeltaTransaction::GetWriteSchema(ClientContext &context) {
+vector<DeltaMultiFileColumnDefinition> DeltaTransaction::GetWriteSchema(ClientContext &context) {
     if (transaction_state == DeltaTransactionState::TRANSACTION_NOT_YET_STARTED) {
         InitializeTransaction(context);
     }

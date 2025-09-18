@@ -194,28 +194,42 @@ private:
 	unique_ptr<FieldList> TakeFieldList(uintptr_t id);
 };
 
-struct MappedDeltaType {
-    explicit MappedDeltaType() = delete;
-    MappedDeltaType(LogicalType type, bool nullable_p) : type(std::move(type)), nullable(nullable_p) {
-    };
-    MappedDeltaType(LogicalType type, bool nullable_p, child_list_t<MappedDeltaType> children_p) : type(std::move(type)), nullable(nullable_p), children(children_p) {
-    };
+// TODO once nullability upstreamed in duckdb remove this class
+struct DeltaMultiFileColumnDefinition : public MultiFileColumnDefinition {
+    DeltaMultiFileColumnDefinition(const string &name, const LogicalType &type, bool nullable_p) : MultiFileColumnDefinition(name, type), children (), nullable(nullable_p) {
+    }
 
-    LogicalType type;
-    bool nullable;
+    static vector<MultiFileColumnDefinition> ConvertToBase(vector<DeltaMultiFileColumnDefinition> col_def) {
+        vector<MultiFileColumnDefinition> res;
+        for (auto &col : col_def) {
+            res.push_back(col.ToBaseColdef());
+        }
+        return res;
+    }
 
-    child_list_t<MappedDeltaType> children;
+    MultiFileColumnDefinition ToBaseColdef() {
+        auto res = MultiFileColumnDefinition(name, type);
+
+        for (auto &child : children) {
+            res.children.push_back(child.ToBaseColdef());
+        }
+
+        return res;
+    }
+
+    vector<DeltaMultiFileColumnDefinition> children;
+    bool nullable = true;
 };
 
 // SchemaVisitor is used to parse the schema of a Delta table from the Kernel
 class SchemaVisitor {
 public:
-	static vector<MultiFileColumnDefinition> VisitSnapshotSchema(ffi::SharedSnapshot *snapshot, bool enable_variant);
-	static vector<MultiFileColumnDefinition> VisitSnapshotGlobalReadSchema(ffi::SharedScan *state, bool logical, bool enable_variant);
-	static vector<MultiFileColumnDefinition> VisitWriteContextSchema(ffi::SharedWriteContext *write_context, bool enable_variant);
+	static vector<DeltaMultiFileColumnDefinition> VisitSnapshotSchema(ffi::SharedSnapshot *snapshot, bool enable_variant);
+	static vector<DeltaMultiFileColumnDefinition> VisitSnapshotGlobalReadSchema(ffi::SharedScan *state, bool logical, bool enable_variant);
+	static vector<DeltaMultiFileColumnDefinition> VisitWriteContextSchema(ffi::SharedWriteContext *write_context, bool enable_variant);
 
 private:
-	unordered_map<uintptr_t, vector<MultiFileColumnDefinition>> inflight_lists;
+	unordered_map<uintptr_t, vector<DeltaMultiFileColumnDefinition>> inflight_lists;
 	uintptr_t next_id = 1;
 
 	ErrorData error;
@@ -225,7 +239,7 @@ private:
 	typedef void(SimpleTypeVisitorFunction)(void *, uintptr_t, ffi::KernelStringSlice, bool is_nullable,
 	                                        const ffi::CStringMap *metadata);
 
-    static void ApplyDeltaColumnMapping(const ffi::CStringMap *metadata, MultiFileColumnDefinition &col_def) {
+    static void ApplyDeltaColumnMapping(const ffi::CStringMap *metadata, DeltaMultiFileColumnDefinition &col_def) {
         auto id = KernelUtils::FetchFromStringMap(metadata, "parquet.field.id");
         if (!id.empty()) {
             col_def.identifier = Value(id).DefaultCastAs(LogicalType::BIGINT);
@@ -245,7 +259,7 @@ private:
 	static void VisitSimpleTypeImpl(SchemaVisitor *state, uintptr_t sibling_list_id, ffi::KernelStringSlice name,
 	                                bool is_nullable, const ffi::CStringMap *metadata) {
 
-	    MultiFileColumnDefinition col_def(KernelUtils::FromDeltaString(name), TypeId);
+	    DeltaMultiFileColumnDefinition col_def(KernelUtils::FromDeltaString(name), TypeId, is_nullable);
 	    ApplyDeltaColumnMapping(metadata, col_def);
 
 		state->AppendToList(sibling_list_id, name, std::move(col_def));
@@ -273,15 +287,15 @@ private:
             type = LogicalType::STRUCT(struct_children);
         }
 
-        MultiFileColumnDefinition col_def(KernelUtils::FromDeltaString(name), type);
+        DeltaMultiFileColumnDefinition col_def(KernelUtils::FromDeltaString(name), type, is_nullable);
         ApplyDeltaColumnMapping(metadata, col_def);
 
         state->AppendToList(sibling_list_id, name, std::move(col_def));
     }
 
 	uintptr_t MakeFieldListImpl(uintptr_t capacity_hint);
-	void AppendToList(uintptr_t id, ffi::KernelStringSlice name, MultiFileColumnDefinition &&child);
-	vector<MultiFileColumnDefinition> TakeFieldList(uintptr_t id);
+	void AppendToList(uintptr_t id, ffi::KernelStringSlice name, DeltaMultiFileColumnDefinition &&child);
+	vector<DeltaMultiFileColumnDefinition> TakeFieldList(uintptr_t id);
 };
 
 // RAII wrapper that returns ownership of a kernel pointer to kernel when it goes out of
@@ -408,7 +422,7 @@ typedef SharedKernelPointer<ffi::SharedSnapshot, ffi::free_snapshot> SharedKerne
 
 class PredicateVisitor : public ffi::EnginePredicate {
 public:
-	PredicateVisitor(const vector<MultiFileColumnDefinition> &columns, optional_ptr<const TableFilterSet> filters);
+	PredicateVisitor(const vector<DeltaMultiFileColumnDefinition> &columns, optional_ptr<const TableFilterSet> filters);
 
 	ErrorData error_data;
 
