@@ -194,6 +194,19 @@ private:
 	unique_ptr<FieldList> TakeFieldList(uintptr_t id);
 };
 
+struct MappedDeltaType {
+    explicit MappedDeltaType() = delete;
+    MappedDeltaType(LogicalType type, bool nullable_p) : type(std::move(type)), nullable(nullable_p) {
+    };
+    MappedDeltaType(LogicalType type, bool nullable_p, child_list_t<MappedDeltaType> children_p) : type(std::move(type)), nullable(nullable_p), children(children_p) {
+    };
+
+    LogicalType type;
+    bool nullable;
+
+    child_list_t<MappedDeltaType> children;
+};
+
 // SchemaVisitor is used to parse the schema of a Delta table from the Kernel
 class SchemaVisitor {
 public:

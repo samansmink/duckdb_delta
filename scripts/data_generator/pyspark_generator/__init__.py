@@ -55,7 +55,7 @@ def generate_test_data_pyspark(base_path, name, current_path, input_path, delete
         else:
             raise f"Unknown mapping mode: {mapping_mode}"
 
-    ## CREATE
+        ## CREATE
         ## CONFIGURE USAGE OF DELETION VECTORS
         if (delete_predicate):
             spark.sql(f"ALTER TABLE test_table_{name} SET TBLPROPERTIES ('delta.enableDeletionVectors' = true);")
