@@ -1,0 +1,30 @@
+# name: test/sql/generated/timetravel.test
+# description: Test time travel
+# group: [generated]
+
+require parquet
+
+require delta
+
+mode skip
+
+statement ok
+copy (SELECT v from delta_scan('./unshredded-variant/part-00000-1e14ba22-3114-46d1-96fb-48b4912507ce-c000.snappy.parquet')) TO '__TEST_DIR__/tmp.parquet';
+
+statement ok
+set variant_legacy_encoding=true;
+
+mode skip
+
+# statement ok
+# from 'duckdb/data/parquet-testing/variant_array_array_string_and_integer.parquet';
+
+# 
+# mode skip
+# 
+# statement ok
+# set variant_legacy_encoding=true;
+
+# statement ok
+# SELECT * from parquet_scan('./unshredded-variant/part-00000-1e14ba22-3114-46d1-96fb-48b4912507ce-c000.snappy.parquet')
+

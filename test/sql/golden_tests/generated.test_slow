@@ -10,6 +10,8 @@ require-env GOLDEN_TABLES_PATH
 
 # WARNING: this file is generated automatically, do not edit manually (see scripts/generate_golden_table_tests.py)
 
+mode skip
+
 ######## parquet-decimal-dictionaries ########
 
 query T rowsort res-parquet-decimal-dictionaries

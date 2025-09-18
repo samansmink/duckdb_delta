@@ -1,0 +1,17 @@
+# name: test/sql/dat/attach.test
+# description: Test attaching a delta table
+# group: [dat]
+
+require parquet
+
+require delta
+
+require-env GENERATED_DATA_AVAILABLE
+
+mode skip
+
+statement ok
+EXPLAIN ANALYZE SELECT value1, value2, value3
+FROM delta_scan('./data/generated/test_file_skipping/int/delta_lake')
+WHERE
+    value1 IN [1,2]

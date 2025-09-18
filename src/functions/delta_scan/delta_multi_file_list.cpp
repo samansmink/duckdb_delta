@@ -762,6 +762,8 @@ void DeltaMultiFileList::InitializeScan() const {
 
 	lazy_loaded_schema = SchemaVisitor::VisitSnapshotGlobalReadSchema(scan.get(), true, enable_variant);
 
+    DeltaMultiFileColumnDefinition::Print(lazy_loaded_schema, "lazy_loaded_schema");
+
 	initialized_scan = true;
 }
 

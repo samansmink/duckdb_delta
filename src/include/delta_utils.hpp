@@ -214,7 +214,25 @@ struct DeltaMultiFileColumnDefinition : public MultiFileColumnDefinition {
             res.children.push_back(child.ToBaseColdef());
         }
 
+        res.default_expression = default_expression->Copy();
+        res.identifier = identifier;
+
         return res;
+    }
+
+    static void Print(vector<DeltaMultiFileColumnDefinition> schema, const string& name) {
+        idx_t nest_level = 0;
+        printf("\nSchema '%s':\n", name.c_str());
+        for (auto &col : schema) {
+            col.Print(nest_level);
+        }
+    }
+    void Print(idx_t nest_level) {
+        string prefix = StringUtil::Repeat("  ", nest_level) + "- ";
+        printf("%s%s (type: %s, identifier: %s)\n", prefix.c_str(), name.c_str(), type.ToString().c_str(), identifier.ToString().c_str());
+        for (auto &child : children) {
+            child.Print(nest_level + 1);
+        }
     }
 
     vector<DeltaMultiFileColumnDefinition> children;

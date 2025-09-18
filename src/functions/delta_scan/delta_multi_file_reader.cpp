@@ -180,8 +180,8 @@ ReaderInitializeType DeltaMultiFileReader::InitializeReader(MultiFileReaderData 
 	    overridden_global_columns = DeltaMultiFileColumnDefinition::ConvertToBase(scan_columns);
 	}
 
-	FinalizeBind(reader_data, bind_data.file_options, bind_data.reader_bind, overridden_global_columns, global_column_ids,
-	             context, global_state);
+    FinalizeBind(reader_data, bind_data.file_options, bind_data.reader_bind, overridden_global_columns, global_column_ids,
+                 context, global_state);
 	return CreateMapping(context, reader_data, overridden_global_columns, global_column_ids, table_filters,
 	                     gstate.file_list, bind_data.reader_bind, bind_data.virtual_columns);
 }
