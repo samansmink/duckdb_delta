@@ -1,5 +1,7 @@
 #include "delta_utils.hpp"
 
+#include <list>
+
 #include "delta_log_types.hpp"
 #include "duckdb/common/operator/decimal_cast_operators.hpp"
 
@@ -652,6 +654,9 @@ void SchemaVisitor::VisitArray(SchemaVisitor *state, uintptr_t sibling_list_id, 
     DeltaMultiFileColumnDefinition list_def(KernelUtils::FromDeltaString(name), list_type, is_nullable);
     list_def.children.push_back(std::move(children.front()));
     list_def.default_expression = make_uniq<ConstantExpression>(Value(list_type));
+
+    // TODO: kinda wonky, but column mapper uses this
+    list_def.children.front().name = "list";
 
     ApplyDeltaColumnMapping(metadata, list_def);
 

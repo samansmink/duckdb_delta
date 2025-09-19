@@ -221,6 +221,7 @@ struct DeltaMultiFileColumnDefinition : public MultiFileColumnDefinition {
     }
 
     static void Print(vector<DeltaMultiFileColumnDefinition> schema, const string& name) {
+        return;
         idx_t nest_level = 0;
         printf("\nSchema '%s':\n", name.c_str());
         for (auto &col : schema) {
@@ -229,7 +230,7 @@ struct DeltaMultiFileColumnDefinition : public MultiFileColumnDefinition {
     }
     void Print(idx_t nest_level) {
         string prefix = StringUtil::Repeat("  ", nest_level) + "- ";
-        printf("%s%s (type: %s, identifier: %s)\n", prefix.c_str(), name.c_str(), type.ToString().c_str(), identifier.ToString().c_str());
+        printf("%s%s %s (identifier: %s)\n", prefix.c_str(), name.c_str(), type.ToString().c_str(), identifier.ToString().c_str());
         for (auto &child : children) {
             child.Print(nest_level + 1);
         }

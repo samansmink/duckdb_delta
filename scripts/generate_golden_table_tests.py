@@ -54,12 +54,6 @@ def write_base_tests():
 
     # Broken cols: array_of_structs, map_of_rows
 
-
-    result += generate_golden_test("table-with-columnmapping-mode-name", "latest_snapshot_test")
-    result += generate_golden_test("table-with-columnmapping-mode-id", "latest_snapshot_test")
-    result += "\n\nmode skip\n\n"
-
-
     result += generate_golden_test("124-decimal-decode-bug", "latest_snapshot_test")
     result += generate_golden_test("125-iterator-bug", "latest_snapshot_test")
     result += generate_golden_test("basic-with-inserts-deletes-checkpoint","latest_snapshot_test")
@@ -122,6 +116,8 @@ def write_base_tests():
     result += generate_golden_test("v2-checkpoint-parquet", "latest_snapshot_test")
     result += generate_golden_test("basic-decimal-table", "latest_snapshot_test")
     result += generate_golden_test("basic-decimal-table-legacy", "latest_snapshot_test")
+    result += generate_golden_test("table-with-columnmapping-mode-name", "latest_snapshot_test")
+    result += generate_golden_test("table-with-columnmapping-mode-id", "latest_snapshot_test")
 
     result += generate_negative_test("deltalog-invalid-protocol-version")
     result += generate_negative_test("deltalog-state-reconstruction-from-checkpoint-missing-metadata")

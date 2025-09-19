@@ -10,26 +10,6 @@ require-env GOLDEN_TABLES_PATH
 
 # WARNING: this file is generated automatically, do not edit manually (see scripts/generate_golden_table_tests.py)
 
-######## table-with-columnmapping-mode-name ########
-
-query T rowsort res-table-with-columnmapping-mode-name
-from delta_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-name/delta')
-
-query T rowsort table-with-columnmapping-mode-name
-from parquet_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-name/expected/**/*.parquet')
-
-######## table-with-columnmapping-mode-id ########
-
-query T rowsort res-table-with-columnmapping-mode-id
-from delta_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-id/delta')
-
-query T rowsort table-with-columnmapping-mode-id
-from parquet_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-id/expected/**/*.parquet')
-
-
-mode skip
-
-
 ######## 124-decimal-decode-bug ########
 
 query T rowsort res-124-decimal-decode-bug
@@ -525,6 +505,22 @@ from delta_scan('${GOLDEN_TABLES_PATH}/basic-decimal-table-legacy/delta')
 
 query T rowsort basic-decimal-table-legacy
 from parquet_scan('${GOLDEN_TABLES_PATH}/basic-decimal-table-legacy/expected/**/*.parquet')
+
+######## table-with-columnmapping-mode-name ########
+
+query T rowsort res-table-with-columnmapping-mode-name
+from delta_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-name/delta')
+
+query T rowsort table-with-columnmapping-mode-name
+from parquet_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-name/expected/**/*.parquet')
+
+######## table-with-columnmapping-mode-id ########
+
+query T rowsort res-table-with-columnmapping-mode-id
+from delta_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-id/delta')
+
+query T rowsort table-with-columnmapping-mode-id
+from parquet_scan('${GOLDEN_TABLES_PATH}/table-with-columnmapping-mode-id/expected/**/*.parquet')
 
 ######## deltalog-invalid-protocol-version ########
 
