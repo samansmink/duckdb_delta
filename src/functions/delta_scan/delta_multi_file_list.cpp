@@ -410,7 +410,7 @@ static unordered_map<idx_t, Value> FindPartitionValues(ParsedExpression &transfo
 }
 
 void ScanDataCallBack::VisitCallbackInternal(ffi::NullableCvoid engine_context, ffi::KernelStringSlice path,
-                                             int64_t size, const ffi::Stats *stats, const ffi::DvInfo *dv_info,
+                                             int64_t size, const ffi::Stats *stats, const ffi::CDvInfo *dv_info,
                                              const ffi::Expression *transform) {
 	auto context = (ScanDataCallBack *)engine_context;
 	auto &snapshot = context->snapshot;
@@ -434,30 +434,21 @@ void ScanDataCallBack::VisitCallbackInternal(ffi::NullableCvoid engine_context, 
 		snapshot.metadata.back()->cardinality = stats->num_records;
 	}
 
-	// Fetch the deletion vector
-	auto selection_vector_res =
-	    ffi::selection_vector_from_dv(dv_info, snapshot.extern_engine.get(), KernelUtils::ToDeltaString(snapshot.root_path));
+    if (dv_info->has_vector) {
+        // Fetch the deletion vector
+        auto selection_vector_res =
+            ffi::selection_vector_from_dv(dv_info->info, snapshot.extern_engine.get(), KernelUtils::ToDeltaString(snapshot.root_path));
 
-	// TODO: remove workaround for https://github.com/duckdb/duckdb-delta/issues/150
-	bool do_workaround = false;
-	if (selection_vector_res.tag == ffi::ExternResult<ffi::KernelBoolSlice>::Tag::Err && selection_vector_res.err._0) {
-		auto error_cast = static_cast<DuckDBEngineError *>(selection_vector_res.err._0);
-		if (error_cast->error_message == "Deletion Vector error: Unknown storage format: ''.") {
-			do_workaround = true;
-		}
-	}
-
-	if (!do_workaround) {
-		ffi::KernelBoolSlice selection_vector;
-		auto res = KernelUtils::TryUnpackResult(selection_vector_res, selection_vector);
-		if (res.HasError()) {
-			context->error = res;
-			return;
-		}
-		if (selection_vector.ptr) {
-			snapshot.metadata.back()->selection_vector = selection_vector;
-		}
-	}
+        ffi::KernelBoolSlice selection_vector;
+        auto res = KernelUtils::TryUnpackResult(selection_vector_res, selection_vector);
+        if (res.HasError()) {
+            context->error = res;
+            return;
+        }
+        if (selection_vector.ptr) {
+            snapshot.metadata.back()->selection_vector = selection_vector;
+        }
+    }
 
 	// Lookup all columns for potential hits in the constant map
 	if (transform) {
@@ -497,7 +488,7 @@ void ScanDataCallBack::VisitCallbackInternal(ffi::NullableCvoid engine_context, 
 }
 
 void ScanDataCallBack::VisitCallback(ffi::NullableCvoid engine_context, ffi::KernelStringSlice path, int64_t size,
-                                     const ffi::Stats *stats, const ffi::DvInfo *dv_info,
+                                     const ffi::Stats *stats, const ffi::CDvInfo *dv_info,
                                      const ffi::Expression *transform, const ffi::CStringMap *partition_values) {
 	try {
 		return VisitCallbackInternal(engine_context, path, size, stats, dv_info, transform);

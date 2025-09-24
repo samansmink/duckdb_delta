@@ -33,7 +33,7 @@ query I
 select add.stats FROM read_json('__TEST_DIR__/write_stats/simple_table/delta_lake/_delta_log/00000000000000000002.json')
 ----
 NULL
-{"numRecords":1}
+{"numRecords":1,"tightBounds":true}
 
 statement ok
 INSERT INTO simple_table FROM range(0,10) t(i) ;
@@ -42,4 +42,4 @@ query I
 select add.stats FROM read_json('__TEST_DIR__/write_stats/simple_table/delta_lake/_delta_log/00000000000000000003.json')
 ----
 NULL
-{"numRecords":10}
+{"numRecords":10,"tightBounds":true}

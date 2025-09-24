@@ -77,6 +77,7 @@ ffi::EngineExpressionVisitor ExpressionVisitor::CreateVisitor(ExpressionVisitor 
 	visitor.visit_minus = VisitSubctractionExpression;
 	visitor.visit_multiply = VisitMultiplyExpression;
 	visitor.visit_divide = VisitDivideExpression;
+    visitor.visit_coalesce = VisitCoalesceExpression;
 
 	visitor.visit_column = VisitColumnExpression;
 	visitor.visit_struct_expr = VisitStructExpression;
@@ -172,6 +173,11 @@ void ExpressionVisitor::VisitDivideExpression(void *state, uintptr_t sibling_lis
 	unique_ptr<ParsedExpression> expression =
 	    make_uniq<FunctionExpression>("/", std::move(*children), nullptr, nullptr, false, true);
 	state_cast->AppendToList(sibling_list_id, std::move(expression));
+}
+
+void ExpressionVisitor::VisitCoalesceExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {
+	auto state_cast = static_cast<ExpressionVisitor *>(state);
+    state_cast->error = ErrorData( ExceptionType::NOT_IMPLEMENTED, "Coalesce expression is not supported yet");
 }
 
 void ExpressionVisitor::VisitMultiplyExpression(void *state, uintptr_t sibling_list_id, uintptr_t child_list_id) {

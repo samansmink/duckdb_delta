@@ -69,14 +69,39 @@ struct CommitInfo {
 };
 
 struct WriteMetaData {
+    static LogicalType GetStatsType() {
+        return LogicalType::STRUCT(child_list_t<LogicalType>({
+            {"numRecords", LogicalType::BIGINT},
+            {"tightBounds", LogicalType::BOOLEAN}
+        }));
+    }
+
+    static Value CreateStatsValue(idx_t num_rows, bool tight_bounds) {
+        return Value::STRUCT(GetStatsType(), {Value::BIGINT(num_rows), Value(tight_bounds)});
+    }
+
     static vector<LogicalType> GetTypes() {
+        // TODO: this needs to be in the schema of the file to write
+        // stats: struct
+        //     |    |-- numRecords: long
+        //     |    |-- tightBounds: boolean
+        //     |    |-- minValues: struct
+        //     |    |    |-- a: struct
+        //     |    |    |    |-- b: struct
+        //     |    |    |    |    |-- c: long
+        //     |    |-- maxValues: struct
+        //     |    |    |-- a: struct
+        //     |    |    |    |-- b: struct
+        //     |    |    |    |    |-- c: long
+
+
         return {
             LogicalType::VARCHAR,
             LogicalType::MAP(LogicalType::VARCHAR, LogicalType::VARCHAR),
             LogicalType::BIGINT,
             LogicalType::BIGINT,
             LogicalType::BOOLEAN,
-            LogicalType::BIGINT,
+            GetStatsType()
         };
     };
     static vector<string> GetNames() {
@@ -86,7 +111,7 @@ struct WriteMetaData {
             "size",
             "modificationTime",
             "dataChange",
-            "numRecords"
+            "stats"
         };
     };
 
@@ -126,7 +151,7 @@ struct WriteMetaData {
         buffer->SetValue(2, current_size, Value::BIGINT(size));
         buffer->SetValue(3, current_size, Value::BIGINT(modification_time));
         buffer->SetValue(4, current_size, data_change);
-        buffer->SetValue(5, current_size, Value::BIGINT(size)); // TODO ???
+        buffer->SetValue(5, current_size, CreateStatsValue(size, true));
         buffer->SetCardinality(current_size+1);
     }
 
@@ -183,8 +208,9 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	        WriteMetaData write_metadata(*table_entry->snapshot, outstanding_appends);
 	        // Convert write metadata to ArrowFFI
 	        auto write_metadata_ffi = write_metadata.ToArrow(context);
+
             // Convert to Delta Kernel EngineData
-	        KernelEngineData write_metadata_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(write_metadata_ffi.array, &write_metadata_ffi.schema, table_entry->snapshot->extern_engine.get()));
+	        KernelEngineData write_metadata_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(write_metadata_ffi.array, &write_metadata_ffi.schema, DuckDBEngineError::AllocateError));
 
 	        // Add the write data to the commit
 	        ffi::add_files(kernel_transaction.get(), write_metadata_engine_data.release());
@@ -218,7 +244,7 @@ void DeltaTransaction::InitializeTransaction(ClientContext &context) {
     auto commit_info_arrow = commit_info.ToArrow(context);
 
     // Convert arrow to Engine Data
-    KernelEngineData commit_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(commit_info_arrow.array, &commit_info_arrow.schema, table_entry->snapshot->extern_engine.get()));
+    KernelEngineData commit_info_engine_data = table_entry->snapshot->TryUnpackKernelResult(ffi::get_engine_data(commit_info_arrow.array, &commit_info_arrow.schema, DuckDBEngineError::AllocateError));
 
     string engine_info = "DuckDB";
     kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::with_engine_info(new_kernel_transaction, KernelUtils::ToDeltaString(engine_info), table_entry->snapshot->extern_engine.get()));
