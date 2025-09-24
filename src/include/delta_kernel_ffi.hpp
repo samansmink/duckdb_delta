@@ -9,69 +9,69 @@
 namespace ffi {
 
 enum class KernelError {
-  UnknownError,
-  FFIError,
+  UnknownError = 0,
+  FFIError = 1,
 #if defined(DEFINE_DEFAULT_ENGINE_BASE)
-  ArrowError,
+  ArrowError = 2,
 #endif
-  EngineDataTypeError,
-  ExtractError,
-  GenericError,
-  IOErrorError,
+  EngineDataTypeError = 3,
+  ExtractError = 4,
+  GenericError = 5,
+  IOErrorError = 6,
 #if defined(DEFINE_DEFAULT_ENGINE_BASE)
-  ParquetError,
-#endif
-#if defined(DEFINE_DEFAULT_ENGINE_BASE)
-  ObjectStoreError,
+  ParquetError = 7,
 #endif
 #if defined(DEFINE_DEFAULT_ENGINE_BASE)
-  ObjectStorePathError,
+  ObjectStoreError = 8,
 #endif
 #if defined(DEFINE_DEFAULT_ENGINE_BASE)
-  ReqwestError,
+  ObjectStorePathError = 9,
 #endif
-  FileNotFoundError,
-  MissingColumnError,
-  UnexpectedColumnTypeError,
-  MissingDataError,
-  MissingVersionError,
-  DeletionVectorError,
-  InvalidUrlError,
-  MalformedJsonError,
-  MissingMetadataError,
-  MissingProtocolError,
-  InvalidProtocolError,
-  MissingMetadataAndProtocolError,
-  ParseError,
-  JoinFailureError,
-  Utf8Error,
-  ParseIntError,
-  InvalidColumnMappingModeError,
-  InvalidTableLocationError,
-  InvalidDecimalError,
-  InvalidStructDataError,
-  InternalError,
-  InvalidExpression,
-  InvalidLogPath,
-  FileAlreadyExists,
-  UnsupportedError,
-  ParseIntervalError,
-  ChangeDataFeedUnsupported,
-  ChangeDataFeedIncompatibleSchema,
-  InvalidCheckpoint,
-  LiteralExpressionTransformError,
-  CheckpointWriteError,
-  SchemaError,
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+  ReqwestError = 10,
+#endif
+  FileNotFoundError = 11,
+  MissingColumnError = 12,
+  UnexpectedColumnTypeError = 13,
+  MissingDataError = 14,
+  MissingVersionError = 15,
+  DeletionVectorError = 16,
+  InvalidUrlError = 17,
+  MalformedJsonError = 18,
+  MissingMetadataError = 19,
+  MissingProtocolError = 20,
+  InvalidProtocolError = 21,
+  MissingMetadataAndProtocolError = 22,
+  ParseError = 23,
+  JoinFailureError = 24,
+  Utf8Error = 25,
+  ParseIntError = 26,
+  InvalidColumnMappingModeError = 27,
+  InvalidTableLocationError = 28,
+  InvalidDecimalError = 29,
+  InvalidStructDataError = 30,
+  InternalError = 31,
+  InvalidExpression = 32,
+  InvalidLogPath = 33,
+  FileAlreadyExists = 34,
+  UnsupportedError = 35,
+  ParseIntervalError = 36,
+  ChangeDataFeedUnsupported = 37,
+  ChangeDataFeedIncompatibleSchema = 38,
+  InvalidCheckpoint = 39,
+  LiteralExpressionTransformError = 40,
+  CheckpointWriteError = 41,
+  SchemaError = 42,
 };
 
 /// Definitions of level verbosity. Verbose Levels are "greater than" less verbose ones. So
 /// Level::ERROR is the lowest, and Level::TRACE the highest.
 enum class Level {
-	ERROR = 0,
-	WARN = 1,
-	INFO = 2,
+  ERROR = 0,
+  WARN = 1,
+  INFO = 2,
 	DEBUGGING = 3,
-	TRACE = 4,
+  TRACE = 4,
 };
 
 /// Format to use for log lines. These correspond to the formats from [`tracing_subscriber`
@@ -385,6 +385,8 @@ using VisitUnaryFn = void(*)(void *data, uintptr_t sibling_list_id, uintptr_t ch
 
 using VisitBinaryFn = void(*)(void *data, uintptr_t sibling_list_id, uintptr_t child_list_id);
 
+using VisitVariadicFn = void(*)(void *data, uintptr_t sibling_list_id, uintptr_t child_list_id);
+
 /// The [`EngineExpressionVisitor`] defines a visitor system to allow engines to build their own
 /// representation of a kernel expression or predicate.
 ///
@@ -521,6 +523,9 @@ struct EngineExpressionVisitor {
   /// Visits the `Divide` binary operator belonging to the list identified by `sibling_list_id`.
   /// The operands will be in a _two_ item list identified by `child_list_id`
   VisitBinaryFn visit_divide;
+  /// Visits the `Coalesce` variadic operator belonging to the list identified by `sibling_list_id`.
+  /// The operands will be in a list identified by `child_list_id`
+  VisitVariadicFn visit_coalesce;
   /// Visits the `column` belonging to the list identified by `sibling_list_id`.
   void (*visit_column)(void *data, uintptr_t sibling_list_id, KernelStringSlice name);
   /// Visits a `Struct` expression belonging to the list identified by `sibling_list_id`.
@@ -656,13 +661,26 @@ struct Stats {
   uint64_t num_records;
 };
 
+/// Contains information that can be used to get a selection vector. If `has_vector` is false, that
+/// indicates there is no selection vector to consider. It is always possible to get a vector out of
+/// a `DvInfo`, but if `has_vector` is false it will just be an empty vector (indicating all
+/// selected). Without this there's no way for a connector using ffi to know if a &DvInfo actually
+/// has a vector in it. We have has_vector() on the rust side, but this isn't exposed via ffi. So
+/// this just wraps the &DvInfo in another struct which includes a boolean that says if there is a
+/// dv to consider or not.  This allows engines to ignore dv info if there isn't any without needing
+/// to make another ffi call at all.
+struct CDvInfo {
+  const DvInfo *info;
+  bool has_vector;
+};
+
 /// This callback will be invoked for each valid file that needs to be read for a scan.
 ///
 /// The arguments to the callback are:
 /// * `context`: a `void*` context this can be anything that engine needs to pass through to each call
 /// * `path`: a `KernelStringSlice` which is the path to the file
 /// * `size`: an `i64` which is the size of the file
-/// * `dv_info`: a [`DvInfo`] struct, which allows getting the selection vector for this file
+/// * `dv_info`: a [`CDvInfo`] struct, which allows getting the selection vector for this file
 /// * `transform`: An optional expression that, if not `NULL`, _must_ be applied to physical data to
 ///   convert it to the correct logical format. If this is `NULL`, no transform is needed.
 /// * `partition_values`: [DEPRECATED] a `HashMap<String, String>` which are partition values
@@ -670,7 +688,7 @@ using CScanCallback = void(*)(NullableCvoid engine_context,
                               KernelStringSlice path,
                               int64_t size,
                               const Stats *stats,
-                              const DvInfo *dv_info,
+                              const CDvInfo *dv_info,
                               const Expression *transform,
                               const CStringMap *partition_map);
 
@@ -1009,7 +1027,7 @@ ExternResult<ArrowFFIData*> get_raw_arrow_data(Handle<ExclusiveEngineData> data,
 /// - `engine` must be a valid Handle to a SharedExternEngine
 ExternResult<Handle<ExclusiveEngineData>> get_engine_data(FFI_ArrowArray array,
                                                           const FFI_ArrowSchema *schema,
-                                                          Handle<SharedExternEngine> engine);
+                                                          AllocateErrorFn allocate_error);
 #endif
 
 /// Call the engine back with the next `EngineData` batch read by Parquet/Json handler. The
