@@ -29,6 +29,11 @@ con = duckdb.connect()
 con.query(f"COPY (SELECT i, i%2 as part FROM range(0,10) tbl(i)) TO '{TMP_PATH}/simple_table_partitioned.parquet'")
 generate_test_data_pyspark(BASE_PATH,'simple_table_partitioned', 'simple_table_partitioned', f'{TMP_PATH}/simple_table_partitioned.parquet', partition_column='part')
 
+## really simple
+con = duckdb.connect()
+con.query(f"COPY (SELECT {{'a':{{'b': i}}}} as i FROM range(0,10) tbl(i)) TO '{TMP_PATH}/simple_table_nested.parquet'")
+generate_test_data_pyspark(BASE_PATH, 'simple_table_nested', 'simple_table_nested', f'{TMP_PATH}/simple_table_nested.parquet')
+
 ## really simple column mapped
 ## Table with simple evolution: adding a column
 base_query = 'SELECT i, i%2 as part FROM range(0,9) tbl(i);'
