@@ -35,7 +35,20 @@ struct DuckDBEngineError : ffi::EngineError {
     string error_message;
 };
 
+//! Object to pass catalog information about a table's latest log entries to the kernel
+struct DeltaLogPathArray {
+    DeltaLogPathArray(Value val);
+
+    // Construct the FFI safe (non-owning) object for kernel to read the log path
+    ffi::LogPathArray GetFFIPtr();
+
+    unique_ptr<StringHeap> string_heap;
+    vector<ffi::FfiLogPath> log_entries;
+};
+
 struct KernelUtils {
+    static vector<ffi::FfiLogPath> CreateLogPath(Value log_path);
+    static LogicalType GetLogPathType();
     static ffi::KernelStringSlice ToDeltaString(const string &str);
     static string FromDeltaString(const struct ffi::KernelStringSlice slice);
     static vector<bool> FromDeltaBoolSlice(const struct ffi::KernelBoolSlice slice);

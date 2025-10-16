@@ -686,8 +686,14 @@ void DeltaMultiFileList::InitializeSnapshot() const {
 	if (!snapshot) {
 	    if (version == DConstants::INVALID_INDEX) {
 	        // Get latest snapshot
-	        snapshot = make_shared_ptr<SharedKernelSnapshot>(
-            TryUnpackKernelResult(ffi::snapshot(path_slice, extern_engine.get())));
+	        if (delta_log_path) {
+	            snapshot = make_shared_ptr<SharedKernelSnapshot>(
+            TryUnpackKernelResult(ffi::snapshot_with_log_tail(path_slice, extern_engine.get(), delta_log_path->GetFFIPtr())));
+	        } else {
+	            snapshot = make_shared_ptr<SharedKernelSnapshot>(
+                TryUnpackKernelResult(ffi::snapshot(path_slice, extern_engine.get())));
+	        }
+
 	        // Set version
 	        auto snapshot_ref = snapshot->GetLockingRef();
 	        this->version = ffi::version(snapshot_ref.GetPtr());

@@ -796,6 +796,71 @@ string DuckDBEngineError::IntoString() {
 	return StringUtil::Format("DeltaKernel %s (%u): %s", KernelErrorEnumToString(etype_copy), etype_copy, message_copy);
 }
 
+DeltaLogPathArray::DeltaLogPathArray(Value log_path) {
+    string_heap = make_uniq<StringHeap>();
+
+    if (log_path.type().id() != LogicalTypeId::LIST) {
+        throw InternalException("log_path must be a list");
+    }
+
+    auto children = ListValue::GetChildren(log_path);
+    log_entries.reserve(children.size());
+
+    for (auto &child: children) {
+        if (child.type().id() != LogicalTypeId::STRUCT) {
+            throw InternalException("log_path must be a list of structs");
+        }
+
+        auto &struct_vals = StructValue::GetChildren(child);
+        if (struct_vals.size() != 3) {
+            throw InternalException("Each log path struct must have location, last_modified and size fields");
+        }
+
+        auto &child_types = StructType::GetChildTypes(child.type());
+        auto &struct_values = StructValue::GetChildren(child);
+
+        string_t location;
+        int64_t last_modified = 0;
+        uint64_t size = DConstants::INVALID_INDEX;
+
+        for (idx_t i = 0; i < struct_values.size(); i++) {
+            auto &name = child_types[i].first;
+            auto &child = struct_values[i];
+            if (name == "location") {
+                location = string_heap->AddString(child.ToString());
+            } else if (name == "last_modified") {
+                last_modified = child.GetValue<int64_t>();
+            } else if (name == "size") {
+                size = child.GetValue<uint64_t>();
+            } else {
+                throw InternalException("Unknown field in log path struct");
+            }
+        }
+
+        if (location.Empty()) {
+            throw InternalException("Location field in log path struct is empty");
+        }
+
+        ffi::KernelStringSlice location_slice = {location.GetData(), location.GetSize()};
+        log_entries.emplace_back(ffi::FfiLogPath{location_slice, last_modified, size});
+    }
+}
+
+ffi::LogPathArray DeltaLogPathArray::GetFFIPtr() {
+    return ffi::LogPathArray{
+        .ptr = log_entries.data(),
+        .len = log_entries.size(),
+    };
+}
+
+LogicalType KernelUtils::GetLogPathType() {
+    return LogicalType::LIST(LogicalType::STRUCT({
+        {"location", LogicalType::VARCHAR},
+        {"last_modified", LogicalType::BIGINT},
+        {"size", LogicalType::UBIGINT}
+    }));
+}
+
 ffi::KernelStringSlice KernelUtils::ToDeltaString(const string &str) {
 	return {str.data(), str.size()};
 }

@@ -153,6 +153,8 @@ protected:
     mutable vector<NestedNotNullConstraint> not_null_constraints;
     mutable bool has_null_constraints_in_arrays = false;
 
+    mutable unique_ptr<DeltaLogPathArray> delta_log_path;
+
     //! Global schema: NOTE: this might be missing some sht
     vector<DeltaMultiFileColumnDefinition> global_columns;
 

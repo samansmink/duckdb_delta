@@ -304,6 +304,25 @@ struct KernelStringSlice {
 
 using AllocateErrorFn = EngineError*(*)(KernelError etype, KernelStringSlice msg);
 
+/// FFI-safe LogPath representation that can be passed from the engine
+struct FfiLogPath {
+  /// URL location of the log file
+  KernelStringSlice location;
+  /// Last modified time as milliseconds since unix epoch
+  int64_t last_modified;
+  /// Size in bytes of the log file
+  uint64_t size;
+};
+
+/// FFI-safe array of LogPaths
+struct LogPathArray {
+  /// Pointer to the first element of the FfiLogPath array. If len is 0, this pointer may be null,
+  /// otherwise it must be non-null.
+  const FfiLogPath *ptr;
+  /// Number of elements in the array
+  uintptr_t len;
+};
+
 /// Delta table version is 8 byte unsigned int
 using Version = uint64_t;
 
@@ -907,7 +926,18 @@ void free_engine(Handle<SharedExternEngine> engine);
 ExternResult<Handle<SharedSnapshot>> snapshot(KernelStringSlice path,
                                               Handle<SharedExternEngine> engine);
 
-/// Get the snapshot from the specified table at a specific version
+/// Get the latest snapshot from the specified table with optional log tail
+///
+/// # Safety
+///
+/// Caller is responsible for passing valid handles and path pointer.
+/// The log_paths array and its contents must remain valid for the duration of this call.
+ExternResult<Handle<SharedSnapshot>> snapshot_with_log_tail(KernelStringSlice path,
+                                                            Handle<SharedExternEngine> engine,
+                                                            LogPathArray log_paths);
+
+/// Get the snapshot from the specified table at a specific version. Note this is only safe for
+/// non-catalog-managed tables.
 ///
 /// # Safety
 ///
@@ -915,6 +945,17 @@ ExternResult<Handle<SharedSnapshot>> snapshot(KernelStringSlice path,
 ExternResult<Handle<SharedSnapshot>> snapshot_at_version(KernelStringSlice path,
                                                          Handle<SharedExternEngine> engine,
                                                          Version version);
+
+/// Get the snapshot from the specified table at a specific version with log tail.
+///
+/// # Safety
+///
+/// Caller is responsible for passing valid handles and path pointer.
+/// The log_tail array and its contents must remain valid for the duration of this call.
+ExternResult<Handle<SharedSnapshot>> snapshot_at_version_with_log_tail(KernelStringSlice path,
+                                                                       Handle<SharedExternEngine> engine,
+                                                                       Version version,
+                                                                       LogPathArray log_tail);
 
 /// # Safety
 ///
@@ -1396,6 +1437,17 @@ void free_scan_metadata_iter(Handle<SharedScanMetadataIterator> data);
 NullableCvoid get_from_string_map(const CStringMap *map,
                                   KernelStringSlice key,
                                   AllocateStringFn allocate_fn);
+
+/// Visit all values in a CStringMap. The callback will be called once for each element of the map
+///
+/// # Safety
+///
+/// The engine is responsible for providing a valid [`CStringMap`] pointer and callback
+void visit_string_map(const CStringMap *map,
+                      NullableCvoid engine_context,
+                      void (*visitor)(NullableCvoid engine_context,
+                                      KernelStringSlice key,
+                                      KernelStringSlice value));
 
 /// Allow getting the transform for a particular row. If the requested row is outside the range of
 /// the passed `CTransforms` returns `NULL`, otherwise returns the element at the index of the
