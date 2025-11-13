@@ -42,6 +42,10 @@ struct DeltaLogPathArray {
     // Construct the FFI safe (non-owning) object for kernel to read the log path
     ffi::LogPathArray GetFFIPtr();
 
+	// For debug printing TODO, remove?
+	Value val;
+
+	// For passign to ffi
     unique_ptr<StringHeap> string_heap;
     vector<ffi::FfiLogPath> log_entries;
 };

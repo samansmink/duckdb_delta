@@ -687,9 +687,11 @@ void DeltaMultiFileList::InitializeSnapshot() const {
 	    if (version == DConstants::INVALID_INDEX) {
 	        // Get latest snapshot
 	        if (delta_log_path) {
+	        	DUCKDB_LOG_INTERNAL(context, "DeltaMultiFileList", LogLevel::LOG_DEBUG, "Loading snapshot from log path: " + delta_log_path->val.ToString());
 	            snapshot = make_shared_ptr<SharedKernelSnapshot>(
             TryUnpackKernelResult(ffi::snapshot_with_log_tail(path_slice, extern_engine.get(), delta_log_path->GetFFIPtr())));
 	        } else {
+	        	DUCKDB_LOG_INTERNAL(context, "DeltaMultiFileList", LogLevel::LOG_DEBUG, "Loading snapshot from latest");
 	            snapshot = make_shared_ptr<SharedKernelSnapshot>(
                 TryUnpackKernelResult(ffi::snapshot(path_slice, extern_engine.get())));
 	        }
@@ -698,6 +700,7 @@ void DeltaMultiFileList::InitializeSnapshot() const {
 	        auto snapshot_ref = snapshot->GetLockingRef();
 	        this->version = ffi::version(snapshot_ref.GetPtr());
 	    } else {
+	    	DUCKDB_LOG_INTERNAL(context, "DeltaMultiFileList", LogLevel::LOG_DEBUG, "Loading snapshot from version '" + to_string(version) + "'");
 	        // Get specific snapshot
 	        snapshot = make_shared_ptr<SharedKernelSnapshot>(
             TryUnpackKernelResult(ffi::snapshot_at_version(path_slice, extern_engine.get(), version)));

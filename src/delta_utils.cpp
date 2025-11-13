@@ -797,6 +797,7 @@ string DuckDBEngineError::IntoString() {
 }
 
 DeltaLogPathArray::DeltaLogPathArray(Value log_path) {
+	val = log_path;
     string_heap = make_uniq<StringHeap>();
 
     if (log_path.type().id() != LogicalTypeId::LIST) {
@@ -811,34 +812,26 @@ DeltaLogPathArray::DeltaLogPathArray(Value log_path) {
             throw InternalException("log_path must be a list of structs");
         }
 
-        auto &struct_vals = StructValue::GetChildren(child);
-        if (struct_vals.size() != 3) {
-            throw InternalException("Each log path struct must have location, last_modified and size fields");
-        }
-
         auto &child_types = StructType::GetChildTypes(child.type());
         auto &struct_values = StructValue::GetChildren(child);
 
         string_t location;
         int64_t last_modified = 0;
         uint64_t size = DConstants::INVALID_INDEX;
-
         for (idx_t i = 0; i < struct_values.size(); i++) {
             auto &name = child_types[i].first;
             auto &child = struct_values[i];
-            if (name == "location") {
-                location = string_heap->AddString(child.ToString());
-            } else if (name == "last_modified") {
+            if (name == "file_name") {
+                location = string_heap->AddString(child.GetValue<string>());
+            } else if (name == "timestamp") {
                 last_modified = child.GetValue<int64_t>();
-            } else if (name == "size") {
+            } else if (name == "file_size") {
                 size = child.GetValue<uint64_t>();
-            } else {
-                throw InternalException("Unknown field in log path struct");
             }
         }
 
-        if (location.Empty()) {
-            throw InternalException("Location field in log path struct is empty");
+        if (location.Empty() || last_modified == 0 || size == DConstants::INVALID_INDEX) {
+            throw InternalException("Invalid log_path struct: " + child.ToString());
         }
 
         ffi::KernelStringSlice location_slice = {location.GetData(), location.GetSize()};
@@ -855,9 +848,9 @@ ffi::LogPathArray DeltaLogPathArray::GetFFIPtr() {
 
 LogicalType KernelUtils::GetLogPathType() {
     return LogicalType::LIST(LogicalType::STRUCT({
-        {"location", LogicalType::VARCHAR},
-        {"last_modified", LogicalType::BIGINT},
-        {"size", LogicalType::UBIGINT}
+        {"file_name", LogicalType::VARCHAR},
+        {"timestamp", LogicalType::BIGINT},
+        {"file_size", LogicalType::UBIGINT}
     }));
 }
 

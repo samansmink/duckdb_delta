@@ -121,6 +121,8 @@ public: // TODO: clean up
 
     mutable KernelExternEngine extern_engine;
 
+	mutable unique_ptr<DeltaLogPathArray> delta_log_path;
+
 protected:
 	// Note: Nearly this entire class is mutable because it represents a lazily expanded list of files that is logically
 	//       const, but not physically.
@@ -153,7 +155,7 @@ protected:
     mutable vector<NestedNotNullConstraint> not_null_constraints;
     mutable bool has_null_constraints_in_arrays = false;
 
-    mutable unique_ptr<DeltaLogPathArray> delta_log_path;
+
 
     //! Global schema: NOTE: this might be missing some sht
     vector<DeltaMultiFileColumnDefinition> global_columns;

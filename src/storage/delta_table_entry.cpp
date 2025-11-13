@@ -62,6 +62,7 @@ TableFunction DeltaTableEntry::GetScanFunctionInternal(ClientContext &context, u
         throw InternalException("Delta table snapshot version does not match at clause version.");
     }
 
+
     function_info->snapshot = this->snapshot;
     function_info->table_name = delta_catalog.GetName();
     delta_scan_function.function_info = std::move(function_info);
