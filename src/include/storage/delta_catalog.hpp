@@ -37,10 +37,12 @@ public:
     idx_t use_specific_version;
 	bool pushdown_partition_info;
 	DeltaFilterPushdownMode filter_pushdown_mode;
-    bool child_mode;
 
     string internal_table_name;
     bool child_catalog_mode = false;
+	string parent_catalog_name;
+	bool parent_commit = false;
+	optional_ptr<TableFunctionCatalogEntry> commit_function;
 
 public:
     string GetInternalTableName() {

@@ -22,7 +22,8 @@
 namespace duckdb {
 
 DeltaTransaction::DeltaTransaction(DeltaCatalog &delta_catalog, TransactionManager &manager, ClientContext &context)
-    : Transaction(manager, context), access_mode(delta_catalog.access_mode), child_mode(delta_catalog.child_mode) {
+    : Transaction(manager, context), access_mode(delta_catalog.access_mode), parent_commit(delta_catalog.parent_commit), parent_catalog_name(delta_catalog.parent_catalog_name) {
+	commit_function = delta_catalog.commit_function;
 }
 
 DeltaTransaction::~DeltaTransaction() {
@@ -251,7 +252,7 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	        ffi::add_files(kernel_transaction.get(), write_metadata_engine_data.release());
 
             // For regular mode we just commit and be done with it
-	        if (!child_mode) {
+	        if (!parent_commit) {
 	            table_entry->snapshot->TryUnpackKernelResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()));
 	            return;
 	        }
@@ -261,23 +262,19 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	        // FIXME: replace with staged commit here and return "real" value instead of bogus value
             Value staged_commit_data("bogus_staged_commit");
 
-	        // Lookup the commit function on the parent catalog
-	        auto &db = manager.GetDB();
-	        CatalogEntryRetriever retriever(context);
-	        EntryLookupInfo info (CatalogType::SCALAR_FUNCTION_ENTRY, "__internal_delta_ccv2_commit_staged");
-	        auto fun = db.ParentCatalog().LookupEntry(retriever, "__catalog_internals", info, OnEntryNotFound::THROW_EXCEPTION);
 
-	        // Invoke the commit function on the catalog
-	        DataChunk output;
-	        TableFunctionInput data = {nullptr, nullptr, nullptr};
-	        output.Initialize(context, {LogicalType::ANY}, 2);
-	        output.SetValue(0,0, staged_commit_data);
+	    	// Invoke the commit function on the catalog
+	    	DataChunk output;
+	    	TableFunctionInput data = {nullptr, nullptr, nullptr};
+	    	output.Initialize(context, {LogicalType::VARCHAR}, 2);
+	    	output.SetValue(0,0, staged_commit_data);
+	    	output.SetCardinality(1);
 
 	        // Special function that expects a 2-sized ANY datachunk containing the input on row 1 that will place the output on row 2
-	        fun.entry->Cast<TableFunctionCatalogEntry>().functions.functions[0].function(context, data, output);
+	        commit_function->functions.functions[0].function(context, data, output);
 
-	        auto res = output.GetValue(0, 1);
-	        if (res.IsNull()) {
+	        auto result = output.GetValue(0, 1);
+	        if (result.IsNull()) {
 	            throw InternalException("Parent catalog failed to commit");
 	        }
 
