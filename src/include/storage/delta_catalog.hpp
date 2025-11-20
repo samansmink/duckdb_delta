@@ -28,7 +28,7 @@ public:
 
 class DeltaCatalog : public Catalog {
 public:
-	explicit DeltaCatalog(AttachedDatabase &db_p, const string &internal_name, AccessMode access_mode);
+	explicit DeltaCatalog(AttachedDatabase &db_p, const string &path, AccessMode access_mode);
 	~DeltaCatalog();
 
 	string path;
@@ -39,7 +39,14 @@ public:
 	DeltaFilterPushdownMode filter_pushdown_mode;
     bool child_mode;
 
+    string internal_table_name;
+    bool child_catalog_mode = false;
+
 public:
+    string GetInternalTableName() {
+        return internal_table_name;
+    }
+
 	void Initialize(bool load_builtin) override;
 	string GetCatalogType() override {
 		return "delta";
