@@ -67,6 +67,10 @@ private:
 
     //! stores a ptr to the table entry that this transaction is writing to
     optional_ptr<DeltaTableEntry> write_entry;
+
+    //! Whether the catalog this tranaction belongs to is run in child_mode. In child_mode commit semantics will be different
+    //! since the parent catalog is in charge of performing the commits
+    bool child_mode = false;
 };
 
 } // namespace duckdb

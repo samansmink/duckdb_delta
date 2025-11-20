@@ -38,7 +38,10 @@ static unique_ptr<Catalog> DeltaCatalogAttach(optional_ptr<StorageExtensionInfo>
 	        res->use_cache = true;
 	        res->use_specific_version = UBigIntValue::Get(option.second.DefaultCastAs(LogicalType::UBIGINT));
 	    }
-	}
+        if (StringUtil::Lower(option.first) == "child_mode") {
+            res->child_mode = true;
+        }
+    }
 
 	res->SetDefaultTable(DEFAULT_SCHEMA, name);
 

@@ -11,15 +11,18 @@
 #include "duckdb/common/arrow/arrow_appender.hpp"
 #include "duckdb/catalog/catalog_entry/view_catalog_entry.hpp"
 #include "duckdb/common/arrow/appender/append_data.hpp"
+#include "duckdb/main/attached_database.hpp"
 #include "duckdb/main/client_context_file_opener.hpp"
 #include "functions/delta_scan/delta_scan.hpp"
 #include "storage/delta_insert.hpp"
+#include "duckdb/main/connection.hpp"
 #include "storage/delta_table_entry.hpp"
+#include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
 
 namespace duckdb {
 
 DeltaTransaction::DeltaTransaction(DeltaCatalog &delta_catalog, TransactionManager &manager, ClientContext &context)
-    : Transaction(manager, context), access_mode(delta_catalog.access_mode) {
+    : Transaction(manager, context), access_mode(delta_catalog.access_mode), child_mode(delta_catalog.child_mode) {
 }
 
 DeltaTransaction::~DeltaTransaction() {
@@ -222,7 +225,6 @@ void DeltaTransaction::CleanUpFiles() {
     outstanding_appends.clear();
 }
 
-
 void DeltaTransaction::Commit(ClientContext &context) {
 	if (transaction_state == DeltaTransactionState::TRANSACTION_STARTED) {
 		transaction_state = DeltaTransactionState::TRANSACTION_FINISHED;
@@ -248,6 +250,38 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	        // Add the write data to the commit
 	        ffi::add_files(kernel_transaction.get(), write_metadata_engine_data.release());
 
+            // For regular mode we just commit and be done with it
+	        if (!child_mode) {
+	            table_entry->snapshot->TryUnpackKernelResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()));
+	            return;
+	        }
+
+	        // In child mode we need to ask our parent catalog to commit for us
+
+	        // FIXME: replace with staged commit here and return "real" value instead of bogus value
+            Value staged_commit_data("bogus_staged_commit");
+
+	        // Lookup the commit function on the parent catalog
+	        auto &db = manager.GetDB();
+	        CatalogEntryRetriever retriever(context);
+	        EntryLookupInfo info (CatalogType::SCALAR_FUNCTION_ENTRY, "__internal_delta_ccv2_commit_staged");
+	        auto fun = db.ParentCatalog().LookupEntry(retriever, "__catalog_internals", info, OnEntryNotFound::THROW_EXCEPTION);
+
+	        // Invoke the commit function on the catalog
+	        DataChunk output;
+	        TableFunctionInput data = {nullptr, nullptr, nullptr};
+	        output.Initialize(context, {LogicalType::ANY}, 2);
+	        output.SetValue(0,0, staged_commit_data);
+
+	        // Special function that expects a 2-sized ANY datachunk containing the input on row 1 that will place the output on row 2
+	        fun.entry->Cast<TableFunctionCatalogEntry>().functions.functions[0].function(context, data, output);
+
+	        auto res = output.GetValue(0, 1);
+	        if (res.IsNull()) {
+	            throw InternalException("Parent catalog failed to commit");
+	        }
+
+	        // FIXME: remove this call: it's a fake placeholder because right now the catalog can't commit yet
 	        table_entry->snapshot->TryUnpackKernelResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()));
 	    }
 	}

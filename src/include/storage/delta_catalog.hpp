@@ -37,6 +37,7 @@ public:
     idx_t use_specific_version;
 	bool pushdown_partition_info;
 	DeltaFilterPushdownMode filter_pushdown_mode;
+    bool child_mode;
 
 public:
 	void Initialize(bool load_builtin) override;
