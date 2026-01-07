@@ -54,6 +54,9 @@ static unique_ptr<Catalog> DeltaCatalogAttach(optional_ptr<StorageExtensionInfo>
 		if (StringUtil::Lower(option.first) == "parent_commit") {
 			res->parent_commit = option.second.GetValue<bool>();
 	    }
+		if (StringUtil::Lower(option.first) == "log_tail") {
+			res->catalog_log_tail = option.second;
+	    }
 	}
 
 	// If parent_commit is enabled, we need to load the internal commit function of the parent catalog here
