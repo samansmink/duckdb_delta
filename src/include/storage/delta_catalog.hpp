@@ -41,6 +41,8 @@ public:
     string internal_table_name;
     bool child_catalog_mode = false;
 	string parent_catalog_name;
+	// string parent_catalog_schema;
+	optional_ptr<TableCatalogEntry> parent_table_entry;
 	bool parent_commit = false;
 	optional_ptr<TableFunctionCatalogEntry> commit_function;
 

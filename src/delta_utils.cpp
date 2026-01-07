@@ -733,6 +733,13 @@ ffi::EngineError *DuckDBEngineError::AllocateError(ffi::KernelError etype, ffi::
 	return error;
 }
 
+ffi::EngineError *DuckDBEngineError::AllocateError(ffi::KernelError etype, const string &msg) {
+	auto error = new DuckDBEngineError;
+	error->etype = etype;
+	error->error_message = string(msg.data(), msg.length());
+	return error;
+}
+
 string DuckDBEngineError::KernelErrorEnumToString(ffi::KernelError err) {
 	const char *KERNEL_ERROR_ENUM_STRINGS[] = {"UnknownError",
 	                                           "FFIError",

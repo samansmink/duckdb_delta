@@ -48,6 +48,9 @@ static unique_ptr<Catalog> DeltaCatalogAttach(optional_ptr<StorageExtensionInfo>
 		if (StringUtil::Lower(option.first) == "parent_catalog") {
 			res->parent_catalog_name = StringValue::Get(option.second);
 	    }
+		// if (StringUtil::Lower(option.first) == "parent_catalog_schema") {
+		// 	res->parent_catalog_schema = StringValue::Get(option.second);
+	 //    }
 		if (StringUtil::Lower(option.first) == "parent_commit") {
 			res->parent_commit = option.second.GetValue<bool>();
 	    }

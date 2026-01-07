@@ -330,7 +330,14 @@ PhysicalOperator &DeltaCatalog::PlanInsert(ClientContext &context, PhysicalPlanG
 
     auto &insert = planner.Make<DeltaInsert>(op, *table_entry, op.column_index_map);
 
-    auto &physical_copy = planner.Make<PhysicalCopyToFile>(GetCopyFunctionReturnLogicalTypes(CopyFunctionReturnType::WRITTEN_FILE_STATISTICS), copy_fun->function, std::move(function_data), op.estimated_cardinality);
+	// Note: this is quite hacky, in the current setup we are expecting the op.table entry to be the entry in the parent
+	//       catalog. We pass through the pointer to this table entry because we need this on commit.
+	if (parent_commit) {
+		auto &delta_transaction = Transaction::Get(context, table_entry->catalog).Cast<DeltaTransaction>();
+		delta_transaction.SetParentTableEntry(op.table);
+	}
+
+	auto &physical_copy = planner.Make<PhysicalCopyToFile>(GetCopyFunctionReturnLogicalTypes(CopyFunctionReturnType::WRITTEN_FILE_STATISTICS), copy_fun->function, std::move(function_data), op.estimated_cardinality);
     auto &physical_copy_ref = physical_copy.Cast<PhysicalCopyToFile>();
 
     auto current_write_uuid = UUID::ToString(UUID::GenerateRandomUUID());
@@ -343,7 +350,7 @@ PhysicalOperator &DeltaCatalog::PlanInsert(ClientContext &context, PhysicalPlanG
         physical_copy_ref.partition_columns = partition_columns;
         physical_copy_ref.write_empty_file = true;
     } else {
-        physical_copy_ref.file_path = delta_path + "/duckdb-" + current_write_uuid + ".parquet";
+        physical_copy_ref.file_path = delta_path + "duckdb-" + current_write_uuid + ".parquet";
         physical_copy_ref.partition_output = false;
         physical_copy_ref.write_empty_file = false;
     }

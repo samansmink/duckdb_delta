@@ -45,6 +45,18 @@ public:
     //! Removes all outstanding appends and removes the files if possible
     void CleanUpFiles();
 
+	static ffi::FFICommitResponse CatalogCommitCallbackInternal(ffi::Handle<ffi::SharedExternEngine> engine,
+															  ffi::KernelStringSlice staged_commit_path,
+															  ffi::ExternContextPtr context);
+	static ffi::ExternResult<ffi::FFICommitResponse> CatalogCommitCallback(ffi::Handle<ffi::SharedExternEngine> engine,
+															  ffi::KernelStringSlice staged_commit_path,
+															  ffi::ExternContextPtr context) noexcept;
+
+	void SetParentTableEntry(TableCatalogEntry& entry) {
+		lock_guard<mutex> guard(lock);
+		parent_table_entry = &entry;
+	}
+
 protected:
     void InitializeTransaction(ClientContext &context);
 
@@ -71,7 +83,10 @@ private:
     //! Whether we should invoke our parent catalog to do the commit or this catalog can do the commit itself
 	bool parent_commit = false;
 	string parent_catalog_name;
+	// string parent_catalog_schema;
 	optional_ptr<TableFunctionCatalogEntry> commit_function;
+	optional_ptr<ClientContext> current_context;
+	optional_ptr<TableCatalogEntry> parent_table_entry;
 };
 
 } // namespace duckdb

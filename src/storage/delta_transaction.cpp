@@ -121,7 +121,6 @@ struct WriteMetaData {
             LogicalType::MAP(LogicalType::VARCHAR, LogicalType::VARCHAR),
             LogicalType::BIGINT,
             LogicalType::BIGINT,
-            LogicalType::BOOLEAN,
             GetStatsType()
         };
     };
@@ -131,7 +130,6 @@ struct WriteMetaData {
             "partitionValues",
             "size",
             "modificationTime",
-            "dataChange",
             "stats"
         };
     };
@@ -155,11 +153,11 @@ struct WriteMetaData {
                 partitions.insert({snapshot.GetPartitionColumns()[part.partition_column_idx], part.partition_value});
             }
 
-            Append(file_name, Value::MAP(partitions), file.row_count, Timestamp::GetCurrentTimestamp().value, true);
+            Append(file_name, Value::MAP(partitions), file.file_size_bytes, file.last_modified_time, true);
         }
     }
 
-    void Append(const string &path, Value partition_values, idx_t size, idx_t modification_time, bool data_change) {
+    void Append(const string &path, Value partition_values, idx_t size, timestamp_t modification_time, bool data_change) {
         idx_t current_size = buffer->size();
         idx_t current_capacity = buffer->GetCapacity();
 
@@ -170,9 +168,8 @@ struct WriteMetaData {
         buffer->SetValue(0, current_size, path);
         buffer->SetValue(1, current_size, partition_values);
         buffer->SetValue(2, current_size, Value::BIGINT(size));
-        buffer->SetValue(3, current_size, Value::BIGINT(modification_time));
-        buffer->SetValue(4, current_size, data_change);
-        buffer->SetValue(5, current_size, CreateStatsValue(size, true));
+        buffer->SetValue(3, current_size, Value::BIGINT(Timestamp::GetEpochMs(modification_time)));
+        buffer->SetValue(4, current_size, CreateStatsValue(size, true));
         buffer->SetCardinality(current_size+1);
     }
 
@@ -226,6 +223,99 @@ void DeltaTransaction::CleanUpFiles() {
     outstanding_appends.clear();
 }
 
+ffi::FFICommitResponse DeltaTransaction::CatalogCommitCallbackInternal(ffi::Handle<ffi::SharedExternEngine> engine,
+															  ffi::KernelStringSlice staged_commit_path,
+															  ffi::ExternContextPtr context) {
+	auto transaction = reinterpret_cast<DeltaTransaction*>(context);
+
+	if (!transaction->current_context) {
+		throw InternalException("No current client context in Catalog Commit Callback");
+	}
+	if (!transaction->write_entry) {
+		throw InternalException("No write entry in Catalog Commit Callback");
+	}
+
+	auto staged_commit_path_string = KernelUtils::FromDeltaString(staged_commit_path);
+
+	// TODO: We're missing timestamp, size, etc so we need to open the file in this hacky way
+	// TODO: this doesn't work when secret has not been created yet so we can't insert into a table without reading it first
+	Connection con2(*transaction->context.lock()->db);
+	con2.BeginTransaction();
+	auto &fs = FileSystem::GetFileSystem(* con2.context);
+	auto commit_file = fs.OpenFile(staged_commit_path_string, FileOpenFlags::FILE_FLAGS_READ);
+	auto size = commit_file->GetFileSize();
+	auto modified_time = commit_file->file_system.GetLastModifiedTime(*commit_file);
+	auto file_content = commit_file->ReadLine();
+	con2.Commit();
+
+	// Parse commit i nfo JSON to get timestamp
+	auto json_start = file_content.find("\"timestamp\":");
+	auto json_end = file_content.find(",", json_start);
+	auto timestamp_str = file_content.substr(json_start + 12, json_end - (json_start + 12));
+	auto timestamp_val = std::stoull(timestamp_str);
+
+	child_list_t<Value> children = {
+		{"staged_commit_path", Value(staged_commit_path_string)},
+		{"staged_commit_size", Value::BIGINT(size)},
+		{"staged_commit_timestamp", Value::BIGINT(timestamp_val)},
+		{"version", Value::BIGINT(transaction->write_entry->snapshot->GetVersion() + 1 )}, // TODO version?
+		{"table_entry_pointer", Value::POINTER(CastPointerToValue(transaction->parent_table_entry.get()))},
+        {"file_modification_time", Value::BIGINT(Timestamp::GetEpochMs(modified_time))},
+	};
+
+	auto staged_commit_data = Value::STRUCT(children);
+
+	// Invoke the commit function on the catalog
+	DataChunk output;
+	TableFunctionInput data = {nullptr, nullptr, nullptr};
+	output.Initialize(*transaction->current_context, {staged_commit_data.type()}, 2);
+	output.SetValue(0,0, staged_commit_data);
+	output.SetCardinality(1);
+
+	// Special function that expects a 2-sized ANY datachunk containing the input on row 1 that will place the output on row 2
+	transaction->commit_function->functions.functions[0].function(*transaction->current_context, data, output);
+
+	auto result = output.GetValue(0, 1);
+	ffi::FFICommitResponse ffi_commit_response;
+	if (result.IsNull()) {
+		ffi_commit_response.tag = ffi::FFICommitResponse::Tag::Conflict;
+	} else {
+		ffi_commit_response.tag = ffi::FFICommitResponse::Tag::Committed;
+	}
+
+	return ffi_commit_response;
+}
+
+ffi::ExternResult<ffi::FFICommitResponse> DeltaTransaction::CatalogCommitCallback(ffi::Handle<ffi::SharedExternEngine> engine,
+															  ffi::KernelStringSlice staged_commit_path,
+															  ffi::ExternContextPtr context) noexcept {
+	ffi::FFICommitResponse ffi_commit_response;
+	try {
+		ffi_commit_response = CatalogCommitCallbackInternal(engine, staged_commit_path, context);
+	} catch ( std::runtime_error &e ) {
+
+	} catch (std::exception &ex) {
+		auto exception = ErrorData(ex);
+		auto error = DuckDBEngineError::AllocateError(ffi::KernelError::GenericError,  exception.Message());
+		ffi::ExternResult<ffi::FFICommitResponse> response;
+		response.tag = ffi::ExternResult<ffi::FFICommitResponse>::Tag::Err;
+		response.err = {error};
+		return response;
+	} catch (...) {
+		string message = "Unknown error occurred when commiting to a Unity Catalog managed commit";
+		auto error = DuckDBEngineError::AllocateError(ffi::KernelError::GenericError,  message);
+		ffi::ExternResult<ffi::FFICommitResponse> response;
+		response.tag = ffi::ExternResult<ffi::FFICommitResponse>::Tag::Err;
+		response.err = {error};
+		return response;
+	}
+
+	return {
+		ffi::ExternResult<ffi::FFICommitResponse>::Tag::Ok,
+		{ffi_commit_response}
+	};
+}
+
 void DeltaTransaction::Commit(ClientContext &context) {
 	if (transaction_state == DeltaTransactionState::TRANSACTION_STARTED) {
 		transaction_state = DeltaTransactionState::TRANSACTION_FINISHED;
@@ -251,34 +341,6 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	        // Add the write data to the commit
 	        ffi::add_files(kernel_transaction.get(), write_metadata_engine_data.release());
 
-            // For regular mode we just commit and be done with it
-	        if (!parent_commit) {
-	            table_entry->snapshot->TryUnpackKernelResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()));
-	            return;
-	        }
-
-	        // In child mode we need to ask our parent catalog to commit for us
-
-	        // FIXME: replace with staged commit here and return "real" value instead of bogus value
-            Value staged_commit_data("bogus_staged_commit");
-
-
-	    	// Invoke the commit function on the catalog
-	    	DataChunk output;
-	    	TableFunctionInput data = {nullptr, nullptr, nullptr};
-	    	output.Initialize(context, {LogicalType::VARCHAR}, 2);
-	    	output.SetValue(0,0, staged_commit_data);
-	    	output.SetCardinality(1);
-
-	        // Special function that expects a 2-sized ANY datachunk containing the input on row 1 that will place the output on row 2
-	        commit_function->functions.functions[0].function(context, data, output);
-
-	        auto result = output.GetValue(0, 1);
-	        if (result.IsNull()) {
-	            throw InternalException("Parent catalog failed to commit");
-	        }
-
-	        // FIXME: remove this call: it's a fake placeholder because right now the catalog can't commit yet
 	        table_entry->snapshot->TryUnpackKernelResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()));
 	    }
 	}
@@ -292,6 +354,8 @@ void DeltaTransaction::Rollback() {
 }
 
 void DeltaTransaction::InitializeTransaction(ClientContext &context) {
+	current_context = context;
+
     if (access_mode == AccessMode::READ_ONLY) {
         throw InvalidInputException("Can not append to a read only table");
     }
@@ -302,7 +366,14 @@ void DeltaTransaction::InitializeTransaction(ClientContext &context) {
     // Start the kernel transaction
     string path =  table_entry->snapshot->GetPaths()[0].path;
     auto path_slice = KernelUtils::ToDeltaString(path);
-    auto new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction(path_slice, table_entry->snapshot->extern_engine.get()));
+
+	ffi::Handle<ffi::ExclusiveTransaction> new_kernel_transaction;
+	if (parent_commit) {
+		auto staged_committer = ffi::create_staged_committer(CatalogCommitCallback, this, table_entry->snapshot->extern_engine.get());
+		  new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction_with_committer(path_slice, table_entry->snapshot->extern_engine.get(), staged_committer));
+	} else {
+		new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction(path_slice, table_entry->snapshot->extern_engine.get()));
+	}
 
     // Create commit info
     CommitInfo commit_info;
@@ -322,8 +393,19 @@ void DeltaTransaction::Append(ClientContext &context, const vector<DeltaDataFile
         InitializeTransaction(context);
     }
 
+	idx_t start = outstanding_appends.size();
+
+
     // Append the newly inserted data
     outstanding_appends.insert(outstanding_appends.end(), append_files.begin(), append_files.end());
+
+	for (idx_t i = start; i < outstanding_appends.size(); i++) {
+		auto &file = outstanding_appends[i];
+		auto & fs = FileSystem::GetFileSystem(context);
+		auto f = fs.OpenFile(file.file_name, FileOpenFlags::FILE_FLAGS_READ);
+		file.last_modified_time = f->file_system.GetLastModifiedTime(*f);
+		file.file_size_bytes = f->GetFileSize();
+	}
 }
 
 DeltaTransaction &DeltaTransaction::Get(ClientContext &context, Catalog &catalog) {

@@ -110,7 +110,7 @@ struct CStringMap;
 /// Transformation expressions that need to be applied to each row `i` in ScanMetadata. You can use
 /// [`get_transform_for_row`] to get the transform for a particular row. If that returns an
 /// associated expression, it _must_ be applied to the data read from the file specified by the
-/// row. The resultant schema for this expression is guaranteed to be `Scan.schema()`. If
+/// row. The resultant schema for this expression is guaranteed to be [`scan_logical_schema()`]. If
 /// `get_transform_for_row` returns `NULL` no expression need be applied and the data read from disk
 /// is already in the correct logical state.
 ///
@@ -135,6 +135,10 @@ struct ExclusiveEngineData;
 
 struct ExclusiveFileReadResultIterator;
 
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+struct ExclusiveTableChanges;
+#endif
+
 /// A handle representing an exclusive transaction on a Delta table. (Similar to a Box<_>)
 ///
 /// This struct provides a safe wrapper around the underlying `Transaction` type,
@@ -151,8 +155,8 @@ struct Expression;
 
 struct KernelExpressionVisitorState;
 
-template<typename T = void>
-struct Option;
+/// Handle for a mutable boxed committer that can be passed across FFI
+struct MutableCommitter;
 
 /// A SQL predicate.
 ///
@@ -179,9 +183,17 @@ struct SharedScanMetadata;
 
 struct SharedScanMetadataIterator;
 
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+struct SharedScanTableChangesIterator;
+#endif
+
 struct SharedSchema;
 
 struct SharedSnapshot;
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+struct SharedTableChangesScan;
+#endif
 
 /// A [`WriteContext`] that provides schema and path information needed for writing data.
 /// This is a shared reference that can be cloned and used across multiple consumers.
@@ -314,7 +326,11 @@ struct FfiLogPath {
   uint64_t size;
 };
 
-/// FFI-safe array of LogPaths
+/// FFI-safe array of LogPaths. Note that we _explicitly_ do not implement `Copy` on this struct
+/// despite all types being `Copy`, to avoid accidental misuse of the pointer.
+///
+/// This struct is essentially a borrowed view into an array. The owner must ensure the underlying
+/// array remains valid for the duration of its use.
 struct LogPathArray {
   /// Pointer to the first element of the FfiLogPath array. If len is 0, this pointer may be null,
   /// otherwise it must be non-null.
@@ -393,6 +409,21 @@ struct FileMeta {
   KernelStringSlice path;
   int64_t last_modified;
   uintptr_t size;
+};
+
+/// A predicate that can be used to skip data when scanning.
+///
+/// When invoking [`scan`], The engine provides a pointer to the (engine's native) predicate, along
+/// with a visitor function that can be invoked to recursively visit the predicate. This engine
+/// state must be valid until the call to [`scan`] returns. Inside that method, the kernel allocates
+/// visitor state, which becomes the second argument to the predicate visitor invocation along with
+/// the engine-provided predicate pointer. The visitor state is valid for the lifetime of the
+/// predicate visitor invocation. Thanks to this double indirection, engine and kernel each retain
+/// ownership of their respective objects, with no need to coordinate memory lifetimes with the
+/// other.
+struct EnginePredicate {
+  void *predicate;
+  uintptr_t (*visitor)(void *predicate, KernelExpressionVisitorState *state);
 };
 
 template<typename T>
@@ -656,19 +687,22 @@ using TracingEventFn = void(*)(Event event);
 
 using TracingLogLineFn = void(*)(KernelStringSlice line);
 
-/// A predicate that can be used to skip data when scanning.
-///
-/// When invoking [`scan`], The engine provides a pointer to the (engine's native) predicate, along
-/// with a visitor function that can be invoked to recursively visit the predicate. This engine
-/// state must be valid until the call to [`scan`] returns. Inside that method, the kernel allocates
-/// visitor state, which becomes the second argument to the predicate visitor invocation along with
-/// the engine-provided predicate pointer. The visitor state is valid for the lifetime of the
-/// predicate visitor invocation. Thanks to this double indirection, engine and kernel each retain
-/// ownership of their respective objects, with no need to coordinate memory lifetimes with the
-/// other.
-struct EnginePredicate {
-  void *predicate;
-  uintptr_t (*visitor)(void *predicate, KernelExpressionVisitorState *state);
+/// FFI-safe implementation for Rust's `Option<T>`
+template<typename T>
+struct OptionalValue {
+  enum class Tag {
+    Some,
+    None,
+  };
+
+  struct Some_Body {
+    T _0;
+  };
+
+  Tag tag;
+  union {
+    Some_Body some;
+  };
 };
 
 /// Give engines an easy way to consume stats
@@ -854,6 +888,36 @@ struct EngineSchemaVisitor {
                         const CStringMap *metadata);
 };
 
+struct FFICommitResponse {
+  enum class Tag {
+    Committed,
+    Conflict,
+  };
+
+  struct Committed_Body {
+    Version version;
+  };
+
+  struct Conflict_Body {
+    Version version;
+  };
+
+  Tag tag;
+  union {
+    Committed_Body committed;
+    Conflict_Body conflict;
+  };
+};
+
+/// This is an opaque pointer to external context. This allows engines to store additional metadata
+/// to 'pass through' to its [`CatalogCommitCallback`].
+using ExternContextPtr = void*;
+
+/// FFI callback for catalog commit operations
+using CatalogCommitCallback = ExternResult<FFICommitResponse>(*)(Handle<SharedExternEngine> engine,
+                                                                 KernelStringSlice staged_commit_path,
+                                                                 ExternContextPtr context);
+
 extern "C" {
 
 /// # Safety
@@ -1028,6 +1092,18 @@ ExternResult<NullableCvoid> get_domain_metadata(Handle<SharedSnapshot> snapshot,
                                                 Handle<SharedExternEngine> engine,
                                                 AllocateStringFn allocate_fn);
 
+/// Get the domain metadata as an optional string allocated by `AllocatedStringFn` for a specific domain in this snapshot
+///
+/// # Safety
+///
+/// Caller is responsible for passing in a valid handle
+ExternResult<bool> visit_domain_metadata(Handle<SharedSnapshot> snapshot,
+                                         Handle<SharedExternEngine> engine,
+                                         NullableCvoid engine_context,
+                                         void (*visitor)(NullableCvoid engine_context,
+                                                         KernelStringSlice domain,
+                                                         KernelStringSlice configuration));
+
 /// Get the number of rows in an engine data
 ///
 /// # Safety
@@ -1106,10 +1182,10 @@ ExternResult<Handle<ExclusiveFileReadResultIterator>> read_parquet_file(Handle<S
 ///
 /// # Safety
 /// Caller is responsible for calling with a valid `Engine`, `Expression`, and `SharedSchema`s
-Handle<SharedExpressionEvaluator> new_expression_evaluator(Handle<SharedExternEngine> engine,
-                                                           Handle<SharedSchema> input_schema,
-                                                           const Expression *expression,
-                                                           Handle<SharedSchema> output_type);
+ExternResult<Handle<SharedExpressionEvaluator>> new_expression_evaluator(Handle<SharedExternEngine> engine,
+                                                                         Handle<SharedSchema> input_schema,
+                                                                         const Expression *expression,
+                                                                         Handle<SharedSchema> output_type);
 
 /// Free an expression evaluator
 /// # Safety
@@ -1124,6 +1200,164 @@ void free_expression_evaluator(Handle<SharedExpressionEvaluator> evaluator);
 ExternResult<Handle<ExclusiveEngineData>> evaluate_expression(Handle<SharedExternEngine> engine,
                                                               Handle<ExclusiveEngineData> *batch,
                                                               Handle<SharedExpressionEvaluator> evaluator);
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get the table changes from the specified table at a specific version
+///
+/// - `table_root`: url pointing at the table root (where `_delta_log` folder is located)
+/// - `engine`: Implementation of `Engine` apis.
+/// - `start_version`: The start version of the change data feed
+///   End version will be the newest table version.
+///
+/// # Safety
+///
+/// Caller is responsible for passing valid handles and path pointer.
+ExternResult<Handle<ExclusiveTableChanges>> table_changes_from_version(KernelStringSlice path,
+                                                                       Handle<SharedExternEngine> engine,
+                                                                       Version start_version);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get the table changes from the specified table between two versions
+///
+/// - `table_root`: url pointing at the table root (where `_delta_log` folder is located)
+/// - `engine`: Implementation of `Engine` apis.
+/// - `start_version`: The start version of the change data feed
+/// - `end_version`: The end version (inclusive) of the change data feed.
+///
+/// # Safety
+///
+/// Caller is responsible for passing valid handles and path pointer.
+ExternResult<Handle<ExclusiveTableChanges>> table_changes_between_versions(KernelStringSlice path,
+                                                                           Handle<SharedExternEngine> engine,
+                                                                           Version start_version,
+                                                                           Version end_version);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Drops table changes.
+///
+/// # Safety
+/// Caller is responsible for passing a valid table changes handle.
+void free_table_changes(Handle<ExclusiveTableChanges> table_changes);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get schema from the specified TableChanges.
+///
+/// # Safety
+///
+/// Caller is responsible for passing a valid table changes handle.
+Handle<SharedSchema> table_changes_schema(Handle<ExclusiveTableChanges> table_changes);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get table root from the specified TableChanges.
+///
+/// # Safety
+///
+/// Caller is responsible for passing a valid table changes handle.
+NullableCvoid table_changes_table_root(Handle<ExclusiveTableChanges> table_changes,
+                                       AllocateStringFn allocate_fn);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get start version from the specified TableChanges.
+///
+/// # Safety
+///
+/// Caller is responsible for passing a valid table changes handle.
+uint64_t table_changes_start_version(Handle<ExclusiveTableChanges> table_changes);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get end version from the specified TableChanges.
+///
+/// # Safety
+///
+/// Caller is responsible for passing a valid table changes handle.
+uint64_t table_changes_end_version(Handle<ExclusiveTableChanges> table_changes);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get a [`TableChangesScan`] over the table specified by the passed table changes.
+/// It is the responsibility of the _engine_ to free this scan when complete by calling [`free_table_changes_scan`].
+/// Consumes TableChanges.
+///
+/// # Safety
+///
+/// Caller is responsible for passing a valid table changes pointer, and engine pointer
+ExternResult<Handle<SharedTableChangesScan>> table_changes_scan(Handle<ExclusiveTableChanges> table_changes,
+                                                                Handle<SharedExternEngine> engine,
+                                                                EnginePredicate *predicate);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Drops a table changes scan.
+///
+/// # Safety
+/// Caller is responsible for passing a valid scan handle.
+void free_table_changes_scan(Handle<SharedTableChangesScan> table_changes_scan);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get the table root of a table changes scan.
+///
+/// # Safety
+/// Engine is responsible for providing a valid scan pointer and allocate_fn (for allocating the
+/// string)
+NullableCvoid table_changes_scan_table_root(Handle<SharedTableChangesScan> table_changes_scan,
+                                            AllocateStringFn allocate_fn);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get the logical schema of the specified table changes scan.
+///
+/// # Safety
+///
+/// Caller is responsible for passing a valid snapshot handle.
+Handle<SharedSchema> table_changes_scan_logical_schema(Handle<SharedTableChangesScan> table_changes_scan);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get the physical schema of the specified table changes scan.
+///
+/// # Safety
+///
+/// Caller is responsible for passing a valid snapshot handle.
+Handle<SharedSchema> table_changes_scan_physical_schema(Handle<SharedTableChangesScan> table_changes_scan);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get an iterator over the data needed to perform a table changes scan. This will return a
+/// [`ScanTableChangesIterator`] which can be passed to [`scan_table_changes_next`] to get the
+/// actual data in the iterator.
+///
+/// # Safety
+///
+/// Engine is responsible for passing a valid [`SharedExternEngine`] and [`SharedTableChangesScan`]
+ExternResult<Handle<SharedScanTableChangesIterator>> table_changes_scan_execute(Handle<SharedTableChangesScan> table_changes_scan,
+                                                                                Handle<SharedExternEngine> engine);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// # Safety
+///
+/// Drops table changes iterator.
+/// Caller is responsible for (at most once) passing a valid pointer returned by a call to
+/// [`table_changes_scan_execute`].
+void free_scan_table_changes_iter(Handle<SharedScanTableChangesIterator> data);
+#endif
+
+#if defined(DEFINE_DEFAULT_ENGINE_BASE)
+/// Get next batch of data from the table changes iterator.
+///
+/// # Safety
+///
+/// The iterator must be valid (returned by [table_changes_scan_execute]) and not yet freed by
+/// [`free_scan_table_changes_iter`].
+ExternResult<ArrowFFIData> scan_table_changes_next(Handle<SharedScanTableChangesIterator> data);
+#endif
 
 /// Free the memory the passed SharedExpression
 ///
@@ -1457,8 +1691,8 @@ void visit_string_map(const CStringMap *map,
 ///
 /// The engine is responsible for providing a valid [`CTransforms`] pointer, and for checking if the
 /// return value is `NULL` or not.
-// Option<Handle<SharedExpression>> get_transform_for_row(uintptr_t row,
-                                                       // const CTransforms *transforms);
+OptionalValue<Handle<SharedExpression>> get_transform_for_row(uintptr_t row,
+                                                              const CTransforms *transforms);
 
 /// Get a selection vector out of a [`DvInfo`] struct
 ///
@@ -1519,6 +1753,16 @@ Handle<SharedPredicate> get_testing_kernel_predicate();
 ExternResult<Handle<ExclusiveTransaction>> transaction(KernelStringSlice path,
                                                        Handle<SharedExternEngine> engine);
 
+/// Start a transaction with a custom committer
+/// NOTE: This consumes the committer handle
+///
+/// # Safety
+///
+/// Caller is responsible for passing valid handles
+ExternResult<Handle<ExclusiveTransaction>> transaction_with_committer(KernelStringSlice path,
+                                                                      Handle<SharedExternEngine> engine,
+                                                                      Handle<MutableCommitter> committer);
+
 /// # Safety
 ///
 /// Caller is responsible for passing a valid handle.
@@ -1543,6 +1787,14 @@ ExternResult<Handle<ExclusiveTransaction>> with_engine_info(Handle<ExclusiveTran
 /// Caller is responsible for passing a valid handle. Consumes write_metadata.
 void add_files(Handle<ExclusiveTransaction> txn, Handle<ExclusiveEngineData> write_metadata);
 
+///
+/// Mark the transaction as having data changes or not (these are recorded at the file level).
+///
+/// # Safety
+///
+/// Caller is responsible for passing a valid handle.
+void set_data_change(Handle<ExclusiveTransaction> txn, bool data_change);
+
 /// Attempt to commit a transaction to the table. Returns version number if successful.
 /// Returns error if the commit fails.
 ///
@@ -1551,6 +1803,31 @@ void add_files(Handle<ExclusiveTransaction> txn, Handle<ExclusiveEngineData> wri
 /// Caller is responsible for passing a valid handle. And MUST NOT USE transaction after this
 /// method is called.
 ExternResult<uint64_t> commit(Handle<ExclusiveTransaction> txn, Handle<SharedExternEngine> engine);
+
+/// Associates an app_id and version with a transaction. These will be applied to the table on commit.
+///
+/// # Returns
+/// A new handle to the transaction that will set the `app_id` version to `version` on commit
+///
+/// # Safety
+/// Caller is responsible for passing [valid][Handle#Validity] handles. The `app_id` string slice must be valid.
+/// CONSUMES TRANSACTION
+ExternResult<Handle<ExclusiveTransaction>> with_transaction_id(Handle<ExclusiveTransaction> txn,
+                                                               KernelStringSlice app_id,
+                                                               int64_t version,
+                                                               Handle<SharedExternEngine> engine);
+
+/// Retrieves the version associated with an app_id from a snapshot.
+///
+/// # Returns
+/// The version number if found, or an error of type `MissingDataError` when the app_id was not set
+///
+/// # Safety
+/// Caller must ensure [valid][Handle#Validity] handles are provided for snapshot and engine. The `app_id`
+/// string slice must be valid.
+ExternResult<OptionalValue<int64_t>> get_app_id_version(Handle<SharedSnapshot> snapshot,
+                                                        KernelStringSlice app_id,
+                                                        Handle<SharedExternEngine> engine);
 
 /// Gets the write context from a transaction. The write context provides schema and path information
 /// needed for writing data.
@@ -1575,6 +1852,22 @@ Handle<SharedSchema> get_write_schema(Handle<SharedWriteContext> write_context);
 /// Engine is responsible for providing a valid WriteContext pointer
 NullableCvoid get_write_path(Handle<SharedWriteContext> write_context,
                              AllocateStringFn allocate_fn);
+
+/// Create a staged committer with external catalog implementation
+///
+/// # Safety
+/// - `callback` must be a valid function pointer
+/// - `context` must remain valid for the lifetime of the committer
+/// - `engine` must be a valid handle
+Handle<MutableCommitter> create_staged_committer(CatalogCommitCallback callback,
+                                                 ExternContextPtr context,
+                                                 Handle<SharedExternEngine> engine);
+
+/// Free a committer handle
+///
+/// # Safety
+/// Caller must pass a valid handle
+void free_committer(Handle<MutableCommitter> committer);
 
 }  // extern "C"
 
