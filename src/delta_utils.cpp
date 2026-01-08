@@ -844,6 +844,9 @@ DeltaLogPathArray::DeltaLogPathArray(Value log_path) {
         ffi::KernelStringSlice location_slice = {location.GetData(), location.GetSize()};
         log_entries.emplace_back(ffi::FfiLogPath{location_slice, last_modified, size});
     }
+
+	// TODO: wth?
+	std::reverse(log_entries.begin(), log_entries.end());
 }
 
 ffi::LogPathArray DeltaLogPathArray::GetFFIPtr() {

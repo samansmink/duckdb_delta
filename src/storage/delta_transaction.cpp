@@ -254,6 +254,10 @@ ffi::FFICommitResponse DeltaTransaction::CatalogCommitCallbackInternal(ffi::Hand
 	auto timestamp_str = file_content.substr(json_start + 12, json_end - (json_start + 12));
 	auto timestamp_val = std::stoull(timestamp_str);
 
+	if (!transaction->parent_table_entry) {
+		throw InternalException("No parent table entry in Catalog Commit Callback");
+	}
+
 	child_list_t<Value> children = {
 		{"staged_commit_path", Value(staged_commit_path_string)},
 		{"staged_commit_size", Value::BIGINT(size)},
@@ -268,14 +272,14 @@ ffi::FFICommitResponse DeltaTransaction::CatalogCommitCallbackInternal(ffi::Hand
 	// Invoke the commit function on the catalog
 	DataChunk output;
 	TableFunctionInput data = {nullptr, nullptr, nullptr};
-	output.Initialize(*transaction->current_context, {staged_commit_data.type()}, 2);
+	output.Initialize(*transaction->current_context, {staged_commit_data.type(), LogicalType::BOOLEAN}, 1);
 	output.SetValue(0,0, staged_commit_data);
 	output.SetCardinality(1);
 
 	// Special function that expects a 2-sized ANY datachunk containing the input on row 1 that will place the output on row 2
 	transaction->commit_function->functions.functions[0].function(*transaction->current_context, data, output);
 
-	auto result = output.GetValue(0, 1);
+	auto result = output.GetValue(1, 0);
 	ffi::FFICommitResponse ffi_commit_response;
 	if (result.IsNull()) {
 		ffi_commit_response.tag = ffi::FFICommitResponse::Tag::Conflict;
@@ -293,9 +297,7 @@ ffi::ExternResult<ffi::FFICommitResponse> DeltaTransaction::CatalogCommitCallbac
 	try {
 		ffi_commit_response = CatalogCommitCallbackInternal(engine, staged_commit_path, context);
 	} catch ( std::runtime_error &e ) {
-
-	} catch (std::exception &ex) {
-		auto exception = ErrorData(ex);
+		auto exception = ErrorData(e);
 		auto error = DuckDBEngineError::AllocateError(ffi::KernelError::GenericError,  exception.Message());
 		ffi::ExternResult<ffi::FFICommitResponse> response;
 		response.tag = ffi::ExternResult<ffi::FFICommitResponse>::Tag::Err;
@@ -368,11 +370,16 @@ void DeltaTransaction::InitializeTransaction(ClientContext &context) {
     auto path_slice = KernelUtils::ToDeltaString(path);
 
 	ffi::Handle<ffi::ExclusiveTransaction> new_kernel_transaction;
-	if (parent_commit) {
-		auto staged_committer = ffi::create_staged_committer(CatalogCommitCallback, this, table_entry->snapshot->extern_engine.get());
-		  new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction_with_committer(path_slice, table_entry->snapshot->extern_engine.get(), staged_committer));
-	} else {
-		new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction(path_slice, table_entry->snapshot->extern_engine.get()));
+
+	{
+		auto snapshot_ref = table_entry->snapshot->snapshot->GetLockingRef();
+
+		if (parent_commit) {
+			auto staged_committer = ffi::create_staged_committer(CatalogCommitCallback, this, table_entry->snapshot->extern_engine.get());
+			new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction_with_committer(snapshot_ref.GetPtr(), staged_committer, table_entry->snapshot->extern_engine.get()));
+		} else {
+			new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction(path_slice, table_entry->snapshot->extern_engine.get()));
+		}
 	}
 
     // Create commit info

@@ -1753,15 +1753,15 @@ Handle<SharedPredicate> get_testing_kernel_predicate();
 ExternResult<Handle<ExclusiveTransaction>> transaction(KernelStringSlice path,
                                                        Handle<SharedExternEngine> engine);
 
-/// Start a transaction with a custom committer
+/// Start a transaction with a custom committer from a snapshot
 /// NOTE: This consumes the committer handle
 ///
 /// # Safety
 ///
 /// Caller is responsible for passing valid handles
-ExternResult<Handle<ExclusiveTransaction>> transaction_with_committer(KernelStringSlice path,
-                                                                      Handle<SharedExternEngine> engine,
-                                                                      Handle<MutableCommitter> committer);
+ExternResult<Handle<ExclusiveTransaction>> transaction_with_committer(Handle<SharedSnapshot> snapshot,
+                                                                      Handle<MutableCommitter> committer,
+                                                                      Handle<SharedExternEngine> engine);
 
 /// # Safety
 ///
