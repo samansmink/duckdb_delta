@@ -293,12 +293,15 @@ ffi::FFICommitResponse DeltaTransaction::CatalogCommitCallbackInternal(ffi::Hand
 ffi::ExternResult<ffi::FFICommitResponse> DeltaTransaction::CatalogCommitCallback(ffi::Handle<ffi::SharedExternEngine> engine,
 															  ffi::KernelStringSlice staged_commit_path,
 															  ffi::ExternContextPtr context) noexcept {
+
+	DeltaTransaction *transaction = reinterpret_cast<DeltaTransaction*>(context);
+
 	ffi::FFICommitResponse ffi_commit_response;
 	try {
 		ffi_commit_response = CatalogCommitCallbackInternal(engine, staged_commit_path, context);
 	} catch ( std::runtime_error &e ) {
-		auto exception = ErrorData(e);
-		auto error = DuckDBEngineError::AllocateError(ffi::KernelError::GenericError,  exception.Message());
+		transaction->active_error = ErrorData(e);
+		auto error = DuckDBEngineError::AllocateError(ffi::KernelError::GenericError,  transaction->active_error.Message());
 		ffi::ExternResult<ffi::FFICommitResponse> response;
 		response.tag = ffi::ExternResult<ffi::FFICommitResponse>::Tag::Err;
 		response.err = {error};
@@ -343,7 +346,17 @@ void DeltaTransaction::Commit(ClientContext &context) {
 	        // Add the write data to the commit
 	        ffi::add_files(kernel_transaction.get(), write_metadata_engine_data.release());
 
-	        table_entry->snapshot->TryUnpackKernelResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()));
+	    	// We have some special error handling here to ensure the error created by DuckDB is properly thrown here, because we can't throw it across the FFI boundary,
+	    	// we need to store it in the transaction
+	    	uint64_t commit_result;
+	    	auto res = KernelUtils::TryUnpackResult(ffi::commit(kernel_transaction.release(), table_entry->snapshot->extern_engine.get()), commit_result);
+	    	if (res.HasError()) {
+	    		if (active_error.HasError()) {
+	    			active_error.Throw();
+	    		} else {
+	    			res.Throw();
+	    		}
+	    	}
 	    }
 	}
 }

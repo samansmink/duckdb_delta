@@ -87,6 +87,8 @@ private:
 	optional_ptr<TableFunctionCatalogEntry> commit_function;
 	optional_ptr<ClientContext> current_context;
 	optional_ptr<TableCatalogEntry> parent_table_entry;
+
+	ErrorData active_error;
 };
 
 } // namespace duckdb
