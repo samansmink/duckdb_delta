@@ -207,7 +207,7 @@ vector<DeltaMultiFileColumnDefinition> DeltaTransaction::GetWriteSchema(ClientCo
     }
 
     auto write_context = ffi::get_write_context(kernel_transaction.get());
-    auto result = SchemaVisitor::VisitWriteContextSchema(write_context, write_entry.get()->snapshot->VariantEnabled());
+    auto result = SchemaVisitor::VisitWriteContextSchema(write_context, write_entry.get()->snapshot->extern_engine.get(), write_entry.get()->snapshot->VariantEnabled());
     return result;
 }
 
@@ -223,102 +223,89 @@ void DeltaTransaction::CleanUpFiles() {
     outstanding_appends.clear();
 }
 
-ffi::FFICommitResponse DeltaTransaction::CatalogCommitCallbackInternal(ffi::Handle<ffi::SharedExternEngine> engine,
-															  ffi::KernelStringSlice staged_commit_path,
-															  ffi::ExternContextPtr context) {
-	auto transaction = reinterpret_cast<DeltaTransaction*>(context);
-
-	if (!transaction->current_context) {
-		throw InternalException("No current client context in Catalog Commit Callback");
-	}
-	if (!transaction->write_entry) {
-		throw InternalException("No write entry in Catalog Commit Callback");
-	}
-
-	auto staged_commit_path_string = KernelUtils::FromDeltaString(staged_commit_path);
-
-	// TODO: We're missing timestamp, size, etc so we need to open the file in this hacky way
-	// TODO: this doesn't work when secret has not been created yet so we can't insert into a table without reading it first
-	Connection con2(*transaction->context.lock()->db);
-	con2.BeginTransaction();
-	auto &fs = FileSystem::GetFileSystem(* con2.context);
-	auto commit_file = fs.OpenFile(staged_commit_path_string, FileOpenFlags::FILE_FLAGS_READ);
-	auto size = commit_file->GetFileSize();
-	auto modified_time = commit_file->file_system.GetLastModifiedTime(*commit_file);
-	auto file_content = commit_file->ReadLine();
-	con2.Commit();
-
-	// Parse commit i nfo JSON to get timestamp
-	auto json_start = file_content.find("\"timestamp\":");
-	auto json_end = file_content.find(",", json_start);
-	auto timestamp_str = file_content.substr(json_start + 12, json_end - (json_start + 12));
-	auto timestamp_val = std::stoull(timestamp_str);
-
-	if (!transaction->parent_table_entry) {
-		throw InternalException("No parent table entry in Catalog Commit Callback");
-	}
-
-	child_list_t<Value> children = {
-		{"staged_commit_path", Value(staged_commit_path_string)},
-		{"staged_commit_size", Value::BIGINT(size)},
-		{"staged_commit_timestamp", Value::BIGINT(timestamp_val)},
-		{"version", Value::BIGINT(transaction->write_entry->snapshot->GetVersion() + 1 )}, // TODO version?
-		{"table_entry_pointer", Value::POINTER(CastPointerToValue(transaction->parent_table_entry.get()))},
-        {"file_modification_time", Value::BIGINT(Timestamp::GetEpochMs(modified_time))},
-	};
-
-	auto staged_commit_data = Value::STRUCT(children);
-
-	// Invoke the commit function on the catalog
-	DataChunk output;
-	TableFunctionInput data = {nullptr, nullptr, nullptr};
-	output.Initialize(*transaction->current_context, {staged_commit_data.type(), LogicalType::BOOLEAN}, 1);
-	output.SetValue(0,0, staged_commit_data);
-	output.SetCardinality(1);
-
-	// Special function that expects a 2-sized ANY datachunk containing the input on row 1 that will place the output on row 2
-	transaction->commit_function->functions.functions[0].function(*transaction->current_context, data, output);
-
-	auto result = output.GetValue(1, 0);
-	ffi::FFICommitResponse ffi_commit_response;
-	if (result.IsNull()) {
-		ffi_commit_response.tag = ffi::FFICommitResponse::Tag::Conflict;
-	} else {
-		ffi_commit_response.tag = ffi::FFICommitResponse::Tag::Committed;
-	}
-
-	return ffi_commit_response;
+// TODO: should we refactor our current setup to use this? We could ensure duckdb-delta only calls this right when it needs it
+ffi::Handle<ffi::ExclusiveCommitsResponse> DeltaTransaction::GetCommitsCallback(const void *context, ffi::CommitsRequest request) {
+	// For now, return nullptr - kernel will fetch commits from log files
+	return nullptr;
 }
 
-ffi::ExternResult<ffi::FFICommitResponse> DeltaTransaction::CatalogCommitCallback(ffi::Handle<ffi::SharedExternEngine> engine,
-															  ffi::KernelStringSlice staged_commit_path,
-															  ffi::ExternContextPtr context) noexcept {
+ffi::OptionalValue<ffi::Handle<ffi::ExclusiveRustString>> DeltaTransaction::CommitCallback(const void *context, ffi::CommitRequest request) {
+	auto transaction = const_cast<DeltaTransaction*>(reinterpret_cast<const DeltaTransaction*>(context));
 
-	DeltaTransaction *transaction = reinterpret_cast<DeltaTransaction*>(context);
-
-	ffi::FFICommitResponse ffi_commit_response;
 	try {
-		ffi_commit_response = CatalogCommitCallbackInternal(engine, staged_commit_path, context);
-	} catch ( std::runtime_error &e ) {
-		transaction->active_error = ErrorData(e);
-		auto error = DuckDBEngineError::AllocateError(ffi::KernelError::GenericError,  transaction->active_error.Message());
-		ffi::ExternResult<ffi::FFICommitResponse> response;
-		response.tag = ffi::ExternResult<ffi::FFICommitResponse>::Tag::Err;
-		response.err = {error};
-		return response;
-	} catch (...) {
-		string message = "Unknown error occurred when commiting to a Unity Catalog managed commit";
-		auto error = DuckDBEngineError::AllocateError(ffi::KernelError::GenericError,  message);
-		ffi::ExternResult<ffi::FFICommitResponse> response;
-		response.tag = ffi::ExternResult<ffi::FFICommitResponse>::Tag::Err;
-		response.err = {error};
-		return response;
-	}
+		if (!transaction->current_context) {
+			throw InternalException("No current client context in Catalog Commit Callback");
+		}
+		if (!transaction->write_entry) {
+			throw InternalException("No write entry in Catalog Commit Callback");
+		}
+		if (!transaction->parent_table_entry) {
+			throw InternalException("No parent table entry in Catalog Commit Callback");
+		}
 
-	return {
-		ffi::ExternResult<ffi::FFICommitResponse>::Tag::Ok,
-		{ffi_commit_response}
-	};
+		// Extract commit info from the request
+		if (request.commit_info.tag != ffi::OptionalValue<ffi::Commit>::Tag::Some) {
+			throw InternalException("CommitCallback received request without commit_info");
+		}
+
+		auto &commit_info = request.commit_info.some._0;
+		auto staged_commit_path_string = KernelUtils::FromDeltaString(commit_info.file_name);
+		auto version = commit_info.version;
+		auto timestamp_val = commit_info.timestamp;
+		auto size = commit_info.file_size;
+		auto file_modification_time = commit_info.file_modification_timestamp;
+
+		child_list_t<Value> children = {
+			{"staged_commit_path", Value(staged_commit_path_string)},
+			{"staged_commit_size", Value::BIGINT(size)},
+			{"staged_commit_timestamp", Value::BIGINT(timestamp_val)},
+			{"version", Value::BIGINT(version)},
+			{"table_entry_pointer", Value::POINTER(CastPointerToValue(transaction->parent_table_entry.get()))},
+			{"file_modification_time", Value::BIGINT(file_modification_time)},
+		};
+
+		auto staged_commit_data = Value::STRUCT(children);
+
+		// Invoke the commit function on the catalog
+		DataChunk output;
+		TableFunctionInput data = {nullptr, nullptr, nullptr};
+		output.Initialize(*transaction->current_context, {staged_commit_data.type(), LogicalType::BOOLEAN}, 1);
+		output.SetValue(0, 0, staged_commit_data);
+		output.SetCardinality(1);
+
+		// Special function that expects a 2-sized ANY datachunk containing the input on row 1 that will place the output on row 2
+		transaction->commit_function->functions.functions[0].function(*transaction->current_context, data, output);
+
+		auto result = output.GetValue(1, 0);
+		if (result.IsNull()) {
+			// Commit conflict - return error string
+			auto error_str = ffi::allocate_kernel_string(KernelUtils::ToDeltaString("Commit conflict"), DuckDBEngineError::AllocateError);
+			ffi::OptionalValue<ffi::Handle<ffi::ExclusiveRustString>> error_result;
+			error_result.tag = ffi::OptionalValue<ffi::Handle<ffi::ExclusiveRustString>>::Tag::Some;
+			error_result.some._0 = error_str.ok._0;
+			return error_result;
+		}
+
+		// Success - return None
+		ffi::OptionalValue<ffi::Handle<ffi::ExclusiveRustString>> success_result;
+		success_result.tag = ffi::OptionalValue<ffi::Handle<ffi::ExclusiveRustString>>::Tag::None;
+		return success_result;
+
+	} catch (std::runtime_error &e) {
+		transaction->active_error = ErrorData(e);
+		auto error_str = ffi::allocate_kernel_string(KernelUtils::ToDeltaString(transaction->active_error.Message()), DuckDBEngineError::AllocateError);
+		ffi::OptionalValue<ffi::Handle<ffi::ExclusiveRustString>> error_result;
+		error_result.tag = ffi::OptionalValue<ffi::Handle<ffi::ExclusiveRustString>>::Tag::Some;
+		error_result.some._0 = error_str.ok._0;
+		return error_result;
+	} catch (...) {
+		string message = "Unknown error occurred when committing to a Unity Catalog managed commit";
+		auto error_str = ffi::allocate_kernel_string(KernelUtils::ToDeltaString(message), DuckDBEngineError::AllocateError);
+		ffi::OptionalValue<ffi::Handle<ffi::ExclusiveRustString>> error_result;
+		error_result.tag = ffi::OptionalValue<ffi::Handle<ffi::ExclusiveRustString>>::Tag::Some;
+		error_result.some._0 = error_str.ok._0;
+		return error_result;
+	}
 }
 
 void DeltaTransaction::Commit(ClientContext &context) {
@@ -388,8 +375,11 @@ void DeltaTransaction::InitializeTransaction(ClientContext &context) {
 		auto snapshot_ref = table_entry->snapshot->snapshot->GetLockingRef();
 
 		if (parent_commit) {
-			auto staged_committer = ffi::create_staged_committer(CatalogCommitCallback, this, table_entry->snapshot->extern_engine.get());
-			new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction_with_committer(snapshot_ref.GetPtr(), staged_committer, table_entry->snapshot->extern_engine.get()));
+			// Create UC commit client with callbacks, passing `this` as the context
+			auto commit_client = ffi::get_uc_commit_client(this, GetCommitsCallback, CommitCallback);
+			auto table_id = KernelUtils::ToDeltaString(path); // TODO: should this be a different identifier?
+			auto uc_committer = table_entry->snapshot->TryUnpackKernelResult(ffi::get_uc_committer(commit_client, table_id, DuckDBEngineError::AllocateError));
+			new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction_with_committer(snapshot_ref.GetPtr(), table_entry->snapshot->extern_engine.get(), uc_committer));
 		} else {
 			new_kernel_transaction = table_entry->snapshot->TryUnpackKernelResult(ffi::transaction(path_slice, table_entry->snapshot->extern_engine.get()));
 		}

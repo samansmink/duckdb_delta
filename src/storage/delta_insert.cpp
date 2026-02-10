@@ -1,7 +1,5 @@
 #include "storage/delta_insert.hpp"
 
-#include <duckdb/common/sort/partition_state.hpp>
-
 #include "duckdb/catalog/catalog_entry/copy_function_catalog_entry.hpp"
 #include "duckdb/main/client_data.hpp"
 #include "duckdb/planner/operator/logical_copy_to_file.hpp"
@@ -12,6 +10,7 @@
 #include "storage/delta_transaction.hpp"
 #include "duckdb/planner/operator/logical_insert.hpp"
 #include "duckdb/planner/operator/logical_create_table.hpp"
+#include "duckdb/catalog/catalog_entry_retriever.hpp"
 #include "storage/delta_table_entry.hpp"
 #include "duckdb/planner/parsed_data/bound_create_table_info.hpp"
 #include "duckdb/execution/operator/projection/physical_projection.hpp"

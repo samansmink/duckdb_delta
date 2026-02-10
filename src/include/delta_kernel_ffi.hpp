@@ -126,6 +126,8 @@ struct DvInfo;
 struct EngineBuilder;
 #endif
 
+struct ExclusiveCommitsResponse;
+
 /// an opaque struct that encapsulates data read by an engine. this handle can be passed back into
 /// some kernel calls to operate on the data, or can be converted into the raw data as read by the
 /// [`delta_kernel::Engine`] by calling [`get_raw_engine_data`]
@@ -134,6 +136,10 @@ struct EngineBuilder;
 struct ExclusiveEngineData;
 
 struct ExclusiveFileReadResultIterator;
+
+/// An opaque type that rust will understand as a string. This can be obtained by calling
+/// [`allocate_kernel_string`] with a [`KernelStringSlice`]
+struct ExclusiveRustString;
 
 #if defined(DEFINE_DEFAULT_ENGINE_BASE)
 struct ExclusiveTableChanges;
@@ -155,6 +161,8 @@ struct Expression;
 
 struct KernelExpressionVisitorState;
 
+struct KernelSchemaVisitorState;
+
 /// Handle for a mutable boxed committer that can be passed across FFI
 struct MutableCommitter;
 
@@ -170,6 +178,8 @@ struct SharedExpression;
 struct SharedExpressionEvaluator;
 
 struct SharedExternEngine;
+
+struct SharedFfiUCCommitsClient;
 
 struct SharedOpaqueExpressionOp;
 
@@ -202,21 +212,6 @@ struct SharedTableChangesScan;
 struct SharedWriteContext;
 
 struct StringSliceIterator;
-
-/// Represents an owned slice of boolean values allocated by the kernel. Any time the engine
-/// receives a `KernelBoolSlice` as a return value from a kernel method, engine is responsible
-/// to free that slice, by calling [super::free_bool_slice] exactly once.
-struct KernelBoolSlice {
-  bool *ptr;
-  uintptr_t len;
-};
-
-/// An owned slice of u64 row indexes allocated by the kernel. The engine is responsible for
-/// freeing this slice by calling [super::free_row_indexes] once.
-struct KernelRowIndexArray {
-  uint64_t *ptr;
-  uintptr_t len;
-};
 
 /// Represents an object that crosses the FFI boundary and which outlives the scope that created
 /// it. It can be passed freely between rust code and external code. The
@@ -315,6 +310,21 @@ struct KernelStringSlice {
 };
 
 using AllocateErrorFn = EngineError*(*)(KernelError etype, KernelStringSlice msg);
+
+/// Represents an owned slice of boolean values allocated by the kernel. Any time the engine
+/// receives a `KernelBoolSlice` as a return value from a kernel method, engine is responsible
+/// to free that slice, by calling [super::free_bool_slice] exactly once.
+struct KernelBoolSlice {
+  bool *ptr;
+  uintptr_t len;
+};
+
+/// An owned slice of u64 row indexes allocated by the kernel. The engine is responsible for
+/// freeing this slice by calling [super::free_row_indexes] once.
+struct KernelRowIndexArray {
+  uint64_t *ptr;
+  uintptr_t len;
+};
 
 /// FFI-safe LogPath representation that can be passed from the engine
 struct FfiLogPath {
@@ -433,6 +443,11 @@ using VisitJunctionFn = void(*)(void *data, uintptr_t sibling_list_id, uintptr_t
 
 using VisitUnaryFn = void(*)(void *data, uintptr_t sibling_list_id, uintptr_t child_list_id);
 
+using VisitParseJsonFn = void(*)(void *data,
+                                 uintptr_t sibling_list_id,
+                                 uintptr_t child_list_id,
+                                 Handle<SharedSchema> output_schema);
+
 using VisitBinaryFn = void(*)(void *data, uintptr_t sibling_list_id, uintptr_t child_list_id);
 
 using VisitVariadicFn = void(*)(void *data, uintptr_t sibling_list_id, uintptr_t child_list_id);
@@ -546,6 +561,10 @@ struct EngineExpressionVisitor {
   /// Visits the `ToJson` unary operator belonging to the list identified by `sibling_list_id`.
   /// The sub-expression will be in a _one_ item list identified by `child_list_id`
   VisitUnaryFn visit_to_json;
+  /// Visits the `ParseJson` expression belonging to the list identified by `sibling_list_id`.
+  /// The sub-expression (JSON string) will be in a _one_ item list identified by `child_list_id`.
+  /// The `output_schema` handle specifies the schema to parse the JSON into.
+  VisitParseJsonFn visit_parse_json;
   /// Visits the `LessThan` binary operator belonging to the list identified by `sibling_list_id`.
   /// The operands will be in a _two_ item list identified by `child_list_id`
   VisitBinaryFn visit_lt;
@@ -663,9 +682,22 @@ struct im_an_unused_struct_that_tricks_msvc_into_compilation {
 	ExternResult<Handle<ExclusiveFileReadResultIterator>> field10;
 	ExternResult<KernelRowIndexArray> field11;
 	ExternResult<Handle<ExclusiveEngineData>> field12;
-    ExternResult<Handle<ExclusiveTransaction>> field13;
-    ExternResult<uint64_t> field14;
-    ExternResult<NullableCvoid> field15;
+	ExternResult<Handle<ExclusiveTransaction>> field13;
+	ExternResult<uint64_t> field14;
+	ExternResult<NullableCvoid> field15;
+};
+
+/// An engine-provided expression along with a visitor function to convert
+/// it to a kernel expression.
+///
+/// The engine provides a pointer to its own expression representation, along
+/// with a visitor function that can convert it to a kernel expression by
+/// calling the appropriate visitor methods on the kernel's
+/// `KernelExpressionVisitorState`. The visitor function returns an expression
+/// ID that can be converted to a kernel expression handle.
+struct EngineExpression {
+  void *expression;
+  uintptr_t (*visitor)(void *expression, KernelExpressionVisitorState *state);
 };
 
 /// An `Event` can generally be thought of a "log message". It contains all the relevant bits such
@@ -686,6 +718,22 @@ struct Event {
 using TracingEventFn = void(*)(Event event);
 
 using TracingLogLineFn = void(*)(KernelStringSlice line);
+
+/// A schema for columns to select from the snapshot.
+///
+/// This allows engines to specify which columns they want to read for projection pushdown or to
+/// specify metadata columns. The engine provides a pointer to its native schema representation
+/// along with a visitor function. The kernel uses this to build a kernel
+/// [`delta_kernel::schema::Schema`] that specifies the projection. Inside [`scan`] the kernel
+/// allocates visitor state, which becomes the second argument to the schema visitor invocation
+/// along with the engine-provided schema pointer. The visitor state is valid for the lifetime of
+/// the schema visitor invocation. Thanks to this double indirection, engine and kernel each retain
+/// ownership of their respective objects, with no need to coordinate memory lifetimes with the
+/// other.
+struct EngineSchema {
+  void *schema;
+  uintptr_t (*visitor)(void *schema, KernelSchemaVisitorState *state);
+};
 
 /// FFI-safe implementation for Rust's `Option<T>`
 template<typename T>
@@ -733,6 +781,7 @@ struct CDvInfo {
 /// * `context`: a `void*` context this can be anything that engine needs to pass through to each call
 /// * `path`: a `KernelStringSlice` which is the path to the file
 /// * `size`: an `i64` which is the size of the file
+/// * `mod_time`: an `i64` which is the time the file was created, as milliseconds since the epoch
 /// * `dv_info`: a [`CDvInfo`] struct, which allows getting the selection vector for this file
 /// * `transform`: An optional expression that, if not `NULL`, _must_ be applied to physical data to
 ///   convert it to the correct logical format. If this is `NULL`, no transform is needed.
@@ -740,6 +789,7 @@ struct CDvInfo {
 using CScanCallback = void(*)(NullableCvoid engine_context,
                               KernelStringSlice path,
                               int64_t size,
+                              int64_t mod_time,
                               const Stats *stats,
                               const CDvInfo *dv_info,
                               const Expression *transform,
@@ -888,37 +938,69 @@ struct EngineSchemaVisitor {
                         const CStringMap *metadata);
 };
 
-struct FFICommitResponse {
-  enum class Tag {
-    Committed,
-    Conflict,
-  };
-
-  struct Committed_Body {
-    Version version;
-  };
-
-  struct Conflict_Body {
-    Version version;
-  };
-
-  Tag tag;
-  union {
-    Committed_Body committed;
-    Conflict_Body conflict;
-  };
+/// The data supplied when requesting commits
+struct CommitsRequest {
+  KernelStringSlice table_id;
+  KernelStringSlice table_uri;
+  OptionalValue<int64_t> start_version;
+  OptionalValue<int64_t> end_version;
 };
 
-/// This is an opaque pointer to external context. This allows engines to store additional metadata
-/// to 'pass through' to its [`CatalogCommitCallback`].
-using ExternContextPtr = void*;
+/// The callback that will be called when the client wants to get a list of commits from UC. The general flow expected from a connector is:
+/// ```ignored
+/// CatalogResponse catalog_response = [rest call to catalog];
+/// ExclusiveCommitsResponse* response = init_commits_response(catalog_response.latest_table_version);
+/// for catalog_commit in catalog_response.list_of_commits {
+///   Commit commit = [construct Commit from catalog_commit];
+///   response = add_commit_to_response(response, commit); // need to handle errors here as well
+/// }
+/// return response;
+/// ```
+///
+/// The `context` pointer is passed through from the `get_uc_commit_client` call and can be used
+/// to maintain connection-local state.
+using CGetCommits = Handle<ExclusiveCommitsResponse>(*)(const void *context, CommitsRequest request);
 
-/// FFI callback for catalog commit operations
-using CatalogCommitCallback = ExternResult<FFICommitResponse>(*)(Handle<SharedExternEngine> engine,
-                                                                 KernelStringSlice staged_commit_path,
-                                                                 ExternContextPtr context);
+/// Data representing a commit.
+struct Commit {
+  int64_t version;
+  int64_t timestamp;
+  KernelStringSlice file_name;
+  int64_t file_size;
+  int64_t file_modification_timestamp;
+};
+
+/// Request to commit a new version to the table. It must include either a `commit_info` or
+/// `latest_backfilled_version`.
+struct CommitRequest {
+  KernelStringSlice table_id;
+  KernelStringSlice table_uri;
+  OptionalValue<Commit> commit_info;
+  OptionalValue<int64_t> latest_backfilled_version;
+  /// json serialized version of the metadata
+  OptionalValue<KernelStringSlice> metadata;
+  /// json serialized version of the protocol
+  OptionalValue<KernelStringSlice> protocol;
+};
+
+/// The callback that will be called when the client wants to commit. Return `None` on success, or
+/// `Some("error description")` if an error occured.
+///
+/// The `context` pointer is passed through from the `get_uc_commit_client` call and can be used
+/// to maintain connection-local state.
+using CCommit = OptionalValue<Handle<ExclusiveRustString>>(*)(const void *context,
+                                                              CommitRequest request);
 
 extern "C" {
+
+/// Allow engines to create an opaque pointer that Rust will understand as a String. Returns an
+/// error if the slice contains invalid utf-8 data.
+///
+/// # Safety
+///
+/// Caller is responsible for passing a valid KernelStringSlice
+ExternResult<Handle<ExclusiveRustString>> allocate_kernel_string(KernelStringSlice kernel_str,
+                                                                 AllocateErrorFn error_fn);
 
 /// # Safety
 ///
@@ -954,7 +1036,9 @@ ExternResult<EngineBuilder*> get_engine_builder(KernelStringSlice path,
 /// # Safety
 ///
 /// Caller must pass a valid EngineBuilder pointer, and valid slices for key and value
-void set_builder_option(EngineBuilder *builder, KernelStringSlice key, KernelStringSlice value);
+ExternResult<bool> set_builder_option(EngineBuilder *builder,
+                                      KernelStringSlice key,
+                                      KernelStringSlice value);
 #endif
 
 #if defined(DEFINE_DEFAULT_ENGINE_BASE)
@@ -1025,6 +1109,16 @@ ExternResult<Handle<SharedSnapshot>> snapshot_at_version_with_log_tail(KernelStr
 ///
 /// Caller is responsible for passing a valid handle.
 void free_snapshot(Handle<SharedSnapshot> snapshot);
+
+/// Perform a full checkpoint of the specified snapshot using the supplied engine.
+///
+/// This writes the checkpoint parquet file and the `_last_checkpoint` file.
+///
+/// # Safety
+///
+/// Caller is responsible for passing valid handles.
+ExternResult<bool> checkpoint_snapshot(Handle<SharedSnapshot> snapshot,
+                                       Handle<SharedExternEngine> engine);
 
 /// Get the version of the specified snapshot
 ///
@@ -1502,6 +1596,67 @@ uintptr_t visit_expression_literal_bool(KernelExpressionVisitorState *state, boo
 /// visit a date literal expression 'value' (i32 representing days since unix epoch)
 uintptr_t visit_expression_literal_date(KernelExpressionVisitorState *state, int32_t value);
 
+/// visit a timestamp literal expression 'value' (i64 representing microseconds since unix epoch)
+uintptr_t visit_expression_literal_timestamp(KernelExpressionVisitorState *state, int64_t value);
+
+/// visit a timestamp_ntz literal expression 'value' (i64 representing microseconds since unix epoch)
+uintptr_t visit_expression_literal_timestamp_ntz(KernelExpressionVisitorState *state,
+                                                 int64_t value);
+
+/// visit a binary literal expression
+///
+/// # Safety
+/// The caller must ensure that `value` points to a valid array of at least `len` bytes.
+uintptr_t visit_expression_literal_binary(KernelExpressionVisitorState *state,
+                                          const uint8_t *value,
+                                          uintptr_t len);
+
+/// visit a decimal literal expression
+///
+/// Returns an error if the precision/scale combination is invalid.
+ExternResult<uintptr_t> visit_expression_literal_decimal(KernelExpressionVisitorState *state,
+                                                         uint64_t value_hi,
+                                                         uint64_t value_lo,
+                                                         uint8_t precision,
+                                                         uint8_t scale,
+                                                         AllocateErrorFn allocate_error);
+
+/// Visit a null literal expression.
+///
+/// Returns an error because NULL literal reconstruction is not supported - type information
+/// is lost when converting from kernel to engine format, so we cannot faithfully reconstruct
+/// the original NULL literal.
+ExternResult<uintptr_t> visit_expression_literal_null(KernelExpressionVisitorState *_state,
+                                                      AllocateErrorFn allocate_error);
+
+uintptr_t visit_predicate_distinct(KernelExpressionVisitorState *state, uintptr_t a, uintptr_t b);
+
+uintptr_t visit_predicate_in(KernelExpressionVisitorState *state, uintptr_t a, uintptr_t b);
+
+uintptr_t visit_predicate_or(KernelExpressionVisitorState *state, EngineIterator *children);
+
+uintptr_t visit_expression_struct(KernelExpressionVisitorState *state, EngineIterator *children);
+
+/// Convert an engine expression to a kernel expression using the visitor
+/// pattern.
+///
+/// # Safety
+///
+/// Caller must ensure that `engine_expression` points to a valid
+/// `EngineExpression` with a valid visitor function and expression pointer.
+ExternResult<Handle<SharedExpression>> visit_engine_expression(EngineExpression *engine_expression,
+                                                               AllocateErrorFn allocate_error);
+
+/// Convert an engine predicate to a kernel predicate using the visitor
+/// pattern.
+///
+/// # Safety
+///
+/// Caller must ensure that `engine_predicate` points to a valid
+/// `EnginePredicate` with a valid visitor function and predicate pointer.
+ExternResult<Handle<SharedPredicate>> visit_engine_predicate(EnginePredicate *engine_predicate,
+                                                             AllocateErrorFn allocate_error);
+
 /// Enable getting called back for tracing (logging) events in the kernel. `max_level` specifies
 /// that only events `<=` to the specified level should be reported.  More verbose Levels are "greater
 /// than" less verbose ones. So Level::ERROR is the lowest, and Level::TRACE the highest.
@@ -1606,7 +1761,8 @@ void free_scan(Handle<SharedScan> scan);
 /// Caller is responsible for passing a valid snapshot pointer, and engine pointer
 ExternResult<Handle<SharedScan>> scan(Handle<SharedSnapshot> snapshot,
                                       Handle<SharedExternEngine> engine,
-                                      EnginePredicate *predicate);
+                                      EnginePredicate *predicate,
+                                      EngineSchema *schema);
 
 /// Get the table root of a scan.
 ///
@@ -1668,9 +1824,10 @@ void free_scan_metadata_iter(Handle<SharedScanMetadataIterator> data);
 /// # Safety
 ///
 /// The engine is responsible for providing a valid [`CStringMap`] pointer and [`KernelStringSlice`]
-NullableCvoid get_from_string_map(const CStringMap *map,
-                                  KernelStringSlice key,
-                                  AllocateStringFn allocate_fn);
+ExternResult<NullableCvoid> get_from_string_map(const CStringMap *map,
+                                                KernelStringSlice key,
+                                                AllocateStringFn allocate_fn,
+                                                Handle<SharedExternEngine> engine);
 
 /// Visit all values in a CStringMap. The callback will be called once for each element of the map
 ///
@@ -1715,9 +1872,10 @@ ExternResult<KernelRowIndexArray> row_indexes_from_dv(const DvInfo *dv_info,
 ///
 /// # Safety
 /// engine is responsible for passing a valid [`SharedScanMetadata`].
-void visit_scan_metadata(Handle<SharedScanMetadata> scan_metadata,
-                         NullableCvoid engine_context,
-                         CScanCallback callback);
+ExternResult<bool> visit_scan_metadata(Handle<SharedScanMetadata> scan_metadata,
+                                       Handle<SharedExternEngine> engine,
+                                       NullableCvoid engine_context,
+                                       CScanCallback callback);
 
 /// Visit the given `schema` using the provided `visitor`. See the documentation of
 /// [`EngineSchemaVisitor`] for a description of how this visitor works.
@@ -1728,6 +1886,260 @@ void visit_scan_metadata(Handle<SharedScanMetadata> scan_metadata,
 ///
 /// Caller is responsible for passing a valid schema handle and schema visitor.
 uintptr_t visit_schema(Handle<SharedSchema> schema, EngineSchemaVisitor *visitor);
+
+/// Visit a string field. Strings can hold arbitrary UTF-8 text data.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_string(KernelSchemaVisitorState *state,
+                                           KernelStringSlice name,
+                                           bool nullable,
+                                           AllocateErrorFn allocate_error);
+
+/// Visit a long field. Long fields store 64-bit signed integers.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_long(KernelSchemaVisitorState *state,
+                                         KernelStringSlice name,
+                                         bool nullable,
+                                         AllocateErrorFn allocate_error);
+
+/// Visit an integer field. Integer fields store 32-bit signed integers.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_integer(KernelSchemaVisitorState *state,
+                                            KernelStringSlice name,
+                                            bool nullable,
+                                            AllocateErrorFn allocate_error);
+
+/// Visit a short field. Short fields store 16-bit signed integers.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_short(KernelSchemaVisitorState *state,
+                                          KernelStringSlice name,
+                                          bool nullable,
+                                          AllocateErrorFn allocate_error);
+
+/// Visit a byte field. Byte fields store 8-bit signed integers.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_byte(KernelSchemaVisitorState *state,
+                                         KernelStringSlice name,
+                                         bool nullable,
+                                         AllocateErrorFn allocate_error);
+
+/// Visit a float field. Float fields store 32-bit floating point numbers.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_float(KernelSchemaVisitorState *state,
+                                          KernelStringSlice name,
+                                          bool nullable,
+                                          AllocateErrorFn allocate_error);
+
+/// Visit a double field. Double fields store 64-bit floating point numbers.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_double(KernelSchemaVisitorState *state,
+                                           KernelStringSlice name,
+                                           bool nullable,
+                                           AllocateErrorFn allocate_error);
+
+/// Visit a boolean field. Boolean fields store true/false values.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_boolean(KernelSchemaVisitorState *state,
+                                            KernelStringSlice name,
+                                            bool nullable,
+                                            AllocateErrorFn allocate_error);
+
+/// Visit a binary field. Binary fields store arbitrary byte arrays.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_binary(KernelSchemaVisitorState *state,
+                                           KernelStringSlice name,
+                                           bool nullable,
+                                           AllocateErrorFn allocate_error);
+
+/// Visit a date field. Date fields store calendar dates without time information.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_date(KernelSchemaVisitorState *state,
+                                         KernelStringSlice name,
+                                         bool nullable,
+                                         AllocateErrorFn allocate_error);
+
+/// Visit a timestamp field. Timestamp fields store date and time with microsecond precision in UTC.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_timestamp(KernelSchemaVisitorState *state,
+                                              KernelStringSlice name,
+                                              bool nullable,
+                                              AllocateErrorFn allocate_error);
+
+/// Visit a timestamp_ntz field. Similar to timestamp but without timezone information.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_timestamp_ntz(KernelSchemaVisitorState *state,
+                                                  KernelStringSlice name,
+                                                  bool nullable,
+                                                  AllocateErrorFn allocate_error);
+
+/// Visit a decimal field. Decimal fields store fixed-precision decimal numbers with specified precision and scale.
+///
+/// # Safety
+///
+/// Caller is responsible for providing a valid `state`, `name` slice with valid UTF-8 data,
+/// and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_decimal(KernelSchemaVisitorState *state,
+                                            KernelStringSlice name,
+                                            uint8_t precision,
+                                            uint8_t scale,
+                                            bool nullable,
+                                            AllocateErrorFn allocate_error);
+
+/// Visit a struct field. Struct fields contain nested fields organized as ordered key-value pairs.
+///
+/// Note: This creates a named struct field (e.g. `address: struct<street, city>`). This function
+/// should _also_ be used to create the final schema element, where the field IDs of the top-level
+/// fields should be passed as `field_ids`. The name for the final schema element is ignored.
+///
+/// The `field_ids` array must contain IDs from previous `visit_field_*` field creation calls.
+///
+/// # Safety
+///
+/// Caller is responsible for providing valid `state`, `name` slice, `field_ids` array pointing
+/// to valid field IDs previously returned by this visitor, and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_struct(KernelSchemaVisitorState *state,
+                                           KernelStringSlice name,
+                                           const uintptr_t *field_ids,
+                                           uintptr_t field_count,
+                                           bool nullable,
+                                           AllocateErrorFn allocate_error);
+
+/// Visit an array field. Array fields store ordered sequences of elements of the same type.
+///
+/// The `element_type_id` must reference a field created by a previous `visit_field_*`. Elements of
+/// the array can be null if and only if the field referenced by `element_type_id` is nullable.
+///
+/// # Safety
+///
+/// Caller is responsible for providing valid `state`, `name` slice, `element_type_id` from
+/// previous `visit_data_type_*` call, and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_array(KernelSchemaVisitorState *state,
+                                          KernelStringSlice name,
+                                          uintptr_t element_type_id,
+                                          bool nullable,
+                                          AllocateErrorFn allocate_error);
+
+/// Visit a map field. Map fields store key-value pairs where all keys have the same type and all
+/// values have the same type.
+///
+/// Both `key_type_id` and `value_type_id` must reference fields created by previous `visit_field_*`
+/// calls. The map can contain null values if and only if the field referenced by `value_type_id` is
+/// nullable.
+///
+/// # Safety
+///
+/// Caller is responsible for providing valid `state`, `name` slice, `key_type_id` and `value_type_id`
+/// from previous `visit_data_type_*` calls, and `allocate_error` function pointer.
+ExternResult<uintptr_t> visit_field_map(KernelSchemaVisitorState *state,
+                                        KernelStringSlice name,
+                                        uintptr_t key_type_id,
+                                        uintptr_t value_type_id,
+                                        bool nullable,
+                                        AllocateErrorFn allocate_error);
+
+/// Visit a variant field.
+///
+/// Takes a struct type ID that defines the variant schema. This must reference a field created by
+/// previous `visit_field_struct` call.
+///
+/// # Safety
+///
+/// Caller must ensure:
+/// - All base parameters are valid as per visit_field_string
+/// - `variant_struct_id` is a valid struct type ID from a previous visitor call
+ExternResult<uintptr_t> visit_field_variant(KernelSchemaVisitorState *state,
+                                            KernelStringSlice name,
+                                            uintptr_t variant_struct_id,
+                                            bool nullable,
+                                            AllocateErrorFn allocate_error);
+
+/// Get a commit client that will call the passed callbacks when it wants to request commits or to
+/// make a commit.
+///
+/// The `context` pointer is passed through to all callback invocations, allowing the connector to
+/// maintain connection-local state. The connector is responsible for ensuring thread-safety of
+/// any data the context points to.
+///
+/// # Safety
+///
+///  Caller is responsible for passing valid pointers for the callbacks and ensuring the context
+///  pointer (if non-null) remains valid for the lifetime of the returned client.
+Handle<SharedFfiUCCommitsClient> get_uc_commit_client(const void *context,
+                                                      CGetCommits get_commits_callback,
+                                                      CCommit commit_callback);
+
+/// # Safety
+///
+/// Caller is responsible for passing a valid handle.
+void free_uc_commit_client(Handle<SharedFfiUCCommitsClient> commit_client);
+
+/// Get a commit client that will call the passed callbacks when it wants to request commits or to
+/// make a commit.
+///
+/// # Safety
+///
+///  Caller is responsible for passing a valid pointer to a SharedFfiUCCommitsClient, obtained via
+///  calling [`get_uc_commit_client`], a valid KernelStringSlice as the table_id, and a valid error
+///  function pointer.
+ExternResult<Handle<MutableCommitter>> get_uc_committer(Handle<SharedFfiUCCommitsClient> commit_client,
+                                                        KernelStringSlice table_id,
+                                                        AllocateErrorFn error_fn);
+
+/// Free a committer obtained via get_uc_committer. Warning! Normally the value returned here will
+/// be consumed when creating a transaction via [`crate::transaction::transaction_with_committer`]
+/// and will NOT need to be freed.
+///
+/// # Safety
+///
+/// Caller is responsible for passing a valid handle obtained via `get_uc_committer`
+void free_uc_commiter(Handle<MutableCommitter> commit_client);
 
 /// Constructs a kernel expression that is passed back as a [`SharedExpression`] handle. The expected
 /// output expression can be found in `ffi/tests/test_expression_visitor/expected.txt`.
@@ -1745,6 +2157,36 @@ Handle<SharedExpression> get_testing_kernel_expression();
 /// [`crate::expressions::free_kernel_predicate`], or [`crate::handle::Handle::drop_handle`].
 Handle<SharedPredicate> get_testing_kernel_predicate();
 
+/// Constructs a simple kernel expression using only primitive types for round-trip testing.
+/// This expression only uses types that have full visitor support.
+///
+/// # Safety
+/// The caller is responsible for freeing the returned memory.
+Handle<SharedExpression> get_simple_testing_kernel_expression();
+
+/// Constructs a simple kernel predicate using only primitive types for round-trip testing.
+/// This predicate only uses types that have full visitor support.
+///
+/// # Safety
+/// The caller is responsible for freeing the returned memory.
+Handle<SharedPredicate> get_simple_testing_kernel_predicate();
+
+/// Compare two kernel expressions for equality. Returns true if they are
+/// structurally equal, false otherwise.
+///
+/// # Safety
+/// Both expr1 and expr2 must be valid SharedExpression handles.
+bool expressions_are_equal(const Handle<SharedExpression> *expr1,
+                           const Handle<SharedExpression> *expr2);
+
+/// Compare two kernel predicates for equality. Returns true if they are
+/// structurally equal, false otherwise.
+///
+/// # Safety
+/// Both pred1 and pred2 must be valid SharedPredicate handles.
+bool predicates_are_equal(const Handle<SharedPredicate> *pred1,
+                          const Handle<SharedPredicate> *pred2);
+
 /// Start a transaction on the latest snapshot of the table.
 ///
 /// # Safety
@@ -1753,15 +2195,15 @@ Handle<SharedPredicate> get_testing_kernel_predicate();
 ExternResult<Handle<ExclusiveTransaction>> transaction(KernelStringSlice path,
                                                        Handle<SharedExternEngine> engine);
 
-/// Start a transaction with a custom committer from a snapshot
+/// Start a transaction with a custom committer on an existing snapshot
 /// NOTE: This consumes the committer handle
 ///
 /// # Safety
 ///
 /// Caller is responsible for passing valid handles
 ExternResult<Handle<ExclusiveTransaction>> transaction_with_committer(Handle<SharedSnapshot> snapshot,
-                                                                      Handle<MutableCommitter> committer,
-                                                                      Handle<SharedExternEngine> engine);
+                                                                      Handle<SharedExternEngine> engine,
+                                                                      Handle<MutableCommitter> committer);
 
 /// # Safety
 ///
@@ -1852,22 +2294,6 @@ Handle<SharedSchema> get_write_schema(Handle<SharedWriteContext> write_context);
 /// Engine is responsible for providing a valid WriteContext pointer
 NullableCvoid get_write_path(Handle<SharedWriteContext> write_context,
                              AllocateStringFn allocate_fn);
-
-/// Create a staged committer with external catalog implementation
-///
-/// # Safety
-/// - `callback` must be a valid function pointer
-/// - `context` must remain valid for the lifetime of the committer
-/// - `engine` must be a valid handle
-Handle<MutableCommitter> create_staged_committer(CatalogCommitCallback callback,
-                                                 ExternContextPtr context,
-                                                 Handle<SharedExternEngine> engine);
-
-/// Free a committer handle
-///
-/// # Safety
-/// Caller must pass a valid handle
-void free_committer(Handle<MutableCommitter> committer);
 
 }  // extern "C"
 

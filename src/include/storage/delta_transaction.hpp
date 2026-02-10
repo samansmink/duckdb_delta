@@ -45,12 +45,10 @@ public:
     //! Removes all outstanding appends and removes the files if possible
     void CleanUpFiles();
 
-	static ffi::FFICommitResponse CatalogCommitCallbackInternal(ffi::Handle<ffi::SharedExternEngine> engine,
-															  ffi::KernelStringSlice staged_commit_path,
-															  ffi::ExternContextPtr context);
-	static ffi::ExternResult<ffi::FFICommitResponse> CatalogCommitCallback(ffi::Handle<ffi::SharedExternEngine> engine,
-															  ffi::KernelStringSlice staged_commit_path,
-															  ffi::ExternContextPtr context) noexcept;
+	//! CGetCommits callback for Unity Catalog managed commits
+	static ffi::Handle<ffi::ExclusiveCommitsResponse> GetCommitsCallback(const void *context, ffi::CommitsRequest request);
+	//! CCommit callback for Unity Catalog managed commits - returns None on success, Some(error) on failure
+	static ffi::OptionalValue<ffi::Handle<ffi::ExclusiveRustString>> CommitCallback(const void *context, ffi::CommitRequest request);
 
 	void SetParentTableEntry(TableCatalogEntry& entry) {
 		lock_guard<mutex> guard(lock);

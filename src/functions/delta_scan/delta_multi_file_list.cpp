@@ -491,7 +491,7 @@ void ScanDataCallBack::VisitCallbackInternal(ffi::NullableCvoid engine_context, 
 	}
 }
 
-void ScanDataCallBack::VisitCallback(ffi::NullableCvoid engine_context, ffi::KernelStringSlice path, int64_t size,
+void ScanDataCallBack::VisitCallback(ffi::NullableCvoid engine_context, ffi::KernelStringSlice path, int64_t size, int64_t mod_time,
                                      const ffi::Stats *stats, const ffi::CDvInfo *dv_info,
                                      const ffi::Expression *transform, const ffi::CStringMap *partition_values) {
 	try {
@@ -504,7 +504,8 @@ void ScanDataCallBack::VisitCallback(ffi::NullableCvoid engine_context, ffi::Ker
 
 void ScanDataCallBack::VisitData(ffi::NullableCvoid engine_context,
                                  ffi::Handle<ffi::SharedScanMetadata> scan_metadata) {
-	ffi::visit_scan_metadata(scan_metadata, engine_context, VisitCallback);
+	auto context = (ScanDataCallBack *)engine_context;
+	ffi::visit_scan_metadata(scan_metadata, context->snapshot.extern_engine.get(), engine_context, VisitCallback);
 }
 
 DeltaMultiFileList::DeltaMultiFileList(ClientContext &context_p, const string &path, idx_t version_p)
@@ -607,7 +608,7 @@ void DeltaMultiFileList::Bind(vector<LogicalType> &return_types, vector<string> 
 	vector<DeltaMultiFileColumnDefinition> visited_schema;
 	{
 		auto snapshot_ref = snapshot->GetLockingRef();
-		visited_schema = SchemaVisitor::VisitSnapshotSchema(snapshot_ref.GetPtr(), enable_variant);
+		visited_schema = SchemaVisitor::VisitSnapshotSchema(snapshot_ref.GetPtr(), extern_engine.get(), enable_variant);
 	}
 
 	for (const auto &field : visited_schema) {
@@ -721,7 +722,7 @@ void DeltaMultiFileList::InitializeScan() const {
 
 	// Create Scan
 	PredicateVisitor visitor(global_columns, &table_filters);
-	scan = TryUnpackKernelResult(ffi::scan(snapshot_ref.GetPtr(), extern_engine.get(), &visitor));
+	scan = TryUnpackKernelResult(ffi::scan(snapshot_ref.GetPtr(), extern_engine.get(), &visitor, nullptr));
 
 	if (visitor.error_data.HasError()) {
 		throw IOException("Failed to initialize Scan for Delta table at '%s'. Original error: '%s'", paths[0].path,
@@ -764,7 +765,7 @@ void DeltaMultiFileList::InitializeScan() const {
 		}
 	}
 
-	lazy_loaded_schema = SchemaVisitor::VisitSnapshotGlobalReadSchema(scan.get(), true, enable_variant);
+	lazy_loaded_schema = SchemaVisitor::VisitSnapshotGlobalReadSchema(scan.get(), extern_engine.get(), true, enable_variant);
 
     DeltaMultiFileColumnDefinition::Print(lazy_loaded_schema, "lazy_loaded_schema");
 

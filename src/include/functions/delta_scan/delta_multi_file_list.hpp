@@ -179,7 +179,7 @@ struct ScanDataCallBack {
 	explicit ScanDataCallBack(const DeltaMultiFileList &snapshot_p) : snapshot(snapshot_p) {
 	}
 	static void VisitData(ffi::NullableCvoid engine_context, ffi::Handle<ffi::SharedScanMetadata> scan_metadata);
-	static void VisitCallback(ffi::NullableCvoid engine_context, struct ffi::KernelStringSlice path, int64_t size,
+	static void VisitCallback(ffi::NullableCvoid engine_context, struct ffi::KernelStringSlice path, int64_t size, int64_t mod_time,
 	                          const ffi::Stats *stats, const ffi::CDvInfo *dv_info, const ffi::Expression *transform,
 	                          const struct ffi::CStringMap *partition_values);
 	static void VisitCallbackInternal(ffi::NullableCvoid engine_context, struct ffi::KernelStringSlice path,
