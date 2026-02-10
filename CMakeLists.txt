@@ -20,8 +20,11 @@ set(EXTENSION_SOURCES
     src/functions/delta_scan/delta_scan.cpp
     src/functions/delta_scan/delta_multi_file_list.cpp
     src/functions/delta_scan/delta_multi_file_reader.cpp
+    src/functions/delta_metadata_scan.cpp
+    src/functions/metadata_functions.cpp
     src/functions/expression_functions.cpp
     src/functions/util_functions.cpp
+    src/functions/delta_transaction_utils/idempotency_helpers.cpp
     src/storage/delta_insert.cpp
     src/storage/delta_catalog.cpp
     src/storage/delta_schema_entry.cpp
@@ -72,10 +75,10 @@ if("${OS_NAME}" STREQUAL "linux")
   elseif("${CMAKE_CXX_COMPILER}" MATCHES "aarch64")
     set(RUST_ENV_VARS
         ${RUST_ENV_VARS}
-        CFLAGS_aarch64_unknown_linux_gnu=--sysroot=/usr/aarch64-linux-gnu)
+        CFLAGS_aarch64_unknown_linux_gnu=--sysroot=/usr)
     set(RUST_ENV_VARS
         ${RUST_ENV_VARS}
-        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc)
+        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-redhat-linux-gcc)
     set(RUST_ENV_VARS
         ${RUST_ENV_VARS}
         OPENSSL_LIB_DIR=${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib
@@ -138,6 +141,9 @@ set(DELTA_KERNEL_FFI_HEADER_CXX
     "${CMAKE_BINARY_DIR}/rust/src/delta_kernel/target/ffi-headers/delta_kernel_ffi.hpp"
 )
 
+# Cargo optimization/debug symbol flags
+set(CARGO_PROFILE "$<IF:$<CONFIG:Debug>,dev,release>")
+
 # Add rust_example as a CMake target
 ExternalProject_Add(
   ${KERNEL_NAME}
@@ -156,8 +162,7 @@ ExternalProject_Add(
   # Build debug build
   BUILD_COMMAND
     ${CMAKE_COMMAND} -E env ${RUST_UNSET_ENV_VARS} ${RUST_ENV_VARS} cargo build
-    --package delta_kernel_ffi --workspace
-    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:--release> --all-features
+    --package delta_kernel_ffi --workspace --profile=${CARGO_PROFILE} --all-features
     ${RUST_PLATFORM_PARAM}
   # Build DATs
   COMMAND
@@ -182,7 +187,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET
     CACHE STRING "Minimum OS X deployment version" FORCE)
 
 # Add the default client
-add_compile_definitions(DEFINE_DEFAULT_ENGINE)
+add_compile_definitions(DEFINE_DEFAULT_ENGINE DEFINE_DEFAULT_ENGINE_BASE)
 
 # Link delta-kernal-rs to static lib
 target_link_libraries(${EXTENSION_NAME} ${DELTA_KERNEL_LIBPATH}

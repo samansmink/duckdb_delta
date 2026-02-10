@@ -8,12 +8,14 @@
 
 #include "storage/delta_table_entry.hpp"
 #include "storage/delta_transaction.hpp"
-#include "duckdb/parser/parsed_data/create_index_info.hpp"
-#include "duckdb/planner/parsed_data/bound_create_table_info.hpp"
-#include "duckdb/parser/parsed_data/drop_info.hpp"
-#include "duckdb/parser/constraints/list.hpp"
+
 #include "duckdb/common/unordered_set.hpp"
+#include "duckdb/parser/constraints/list.hpp"
+#include "duckdb/parser/expression/columnref_expression.hpp"
+#include "duckdb/parser/parsed_data/create_index_info.hpp"
+#include "duckdb/parser/parsed_data/drop_info.hpp"
 #include "duckdb/parser/parsed_expression_iterator.hpp"
+#include "duckdb/planner/parsed_data/bound_create_table_info.hpp"
 #include "duckdb/planner/tableref/bound_at_clause.hpp"
 
 namespace duckdb {
@@ -117,16 +119,17 @@ unique_ptr<DeltaTableEntry> DeltaSchemaEntry::CreateTableEntry(ClientContext &co
 	vector<string> names;
 	snapshot->Bind(return_types, names);
 
-    // TODO: forward nullability constraints
+	// TODO: forward nullability constraints
 
 	CreateTableInfo table_info;
 	for (idx_t i = 0; i < return_types.size(); i++) {
 		table_info.columns.AddColumn(ColumnDefinition(names[i], return_types[i]));
 	}
-	table_info.table = !delta_catalog.internal_table_name.empty() ? delta_catalog.internal_table_name : catalog.GetName();
+	table_info.table =
+	    !delta_catalog.internal_table_name.empty() ? delta_catalog.internal_table_name : catalog.GetName();
 
-    // Copy over constraints to table info TODO: these are incompatible currently
-    // table_info.constraints = snapshot->not_null_constraints;}
+	// Copy over constraints to table info TODO: these are incompatible currently
+	// table_info.constraints = snapshot->not_null_constraints;}
 
 	auto table_entry = make_uniq<DeltaTableEntry>(delta_catalog, *this, table_info);
 	table_entry->snapshot = std::move(snapshot);
@@ -163,18 +166,18 @@ optional_ptr<CatalogEntry> DeltaSchemaEntry::LookupEntry(CatalogTransaction tran
 
 	auto type = lookup_info.GetCatalogType();
 	auto &name = lookup_info.GetEntryName();
-    auto &delta_catalog = catalog.Cast<DeltaCatalog>();
+	auto &delta_catalog = catalog.Cast<DeltaCatalog>();
 
 	if (type == CatalogType::TABLE_ENTRY && (name == catalog.GetName() || name == delta_catalog.internal_table_name)) {
 		auto &delta_transaction = GetDeltaTransaction(transaction);
 
-	    idx_t version = delta_catalog.use_specific_version;
+		idx_t version = delta_catalog.use_specific_version;
 
-	    // If there's an AT clause we are doing timetravel
-	    auto at_clause = lookup_info.GetAtClause();
-	    if (at_clause) {
-	        version = ParseDeltaVersionFromAtClause(*at_clause);
-	    }
+		// If there's an AT clause we are doing timetravel
+		auto at_clause = lookup_info.GetAtClause();
+		if (at_clause) {
+			version = ParseDeltaVersionFromAtClause(*at_clause);
+		}
 
 		auto transaction_table_entry = delta_transaction.GetTableEntry(version);
 		if (transaction_table_entry) {
@@ -184,10 +187,10 @@ optional_ptr<CatalogEntry> DeltaSchemaEntry::LookupEntry(CatalogTransaction tran
 		if (delta_catalog.UseCachedSnapshot()) {
 			unique_lock<mutex> l(lock);
 
-		    // If the version being requested is different from the one we have cached, we
-		    if (delta_catalog.use_specific_version != version) {
-		        return delta_transaction.InitializeTableEntry(context, *this, version);
-		    }
+			// If the version being requested is different from the one we have cached, we
+			if (delta_catalog.use_specific_version != version) {
+				return delta_transaction.InitializeTableEntry(context, *this, version);
+			}
 
 			if (!cached_table) {
 				cached_table = CreateTableEntry(context, version);

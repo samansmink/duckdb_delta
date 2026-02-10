@@ -34,7 +34,7 @@ public:
 	string path;
 	AccessMode access_mode;
 	bool use_cache;
-    idx_t use_specific_version;
+	idx_t use_specific_version;
 	bool pushdown_partition_info;
 	DeltaFilterPushdownMode filter_pushdown_mode;
 
@@ -51,17 +51,17 @@ public:
 	Value catalog_log_tail;
 
 public:
-    string GetInternalTableName() {
-        return internal_table_name;
-    }
+	string GetInternalTableName() {
+		return internal_table_name;
+	}
 
 	void Initialize(bool load_builtin) override;
 	string GetCatalogType() override {
 		return "delta";
 	}
 
-    bool SupportsTimeTravel() const override {
-	    return true;
+	bool SupportsTimeTravel() const override {
+		return true;
 	}
 
 	optional_ptr<CatalogEntry> CreateSchema(CatalogTransaction transaction, CreateSchemaInfo &info) override;
